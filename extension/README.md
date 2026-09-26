@@ -1,65 +1,73 @@
-# TrackMyHunt Browser Extension (MV3)
+# TrackMyHunt Browser Extension
 
-Side-panel extension that detects the job on the active tab and saves it to
-your TrackMyHunt dashboard via `POST /api/applications`.
+Companion Chrome extension (Manifest V3) for TrackMyHunt. It detects the job on the active browser tab and saves it to the TrackMyHunt dashboard in one click, from a side panel that matches the web app's design system.
 
-## Extraction engine (layered)
+## How It Works
 
-`src/content/extract/pipeline.js` orchestrates, first non-empty value wins:
+```
+Job page open
+ ↓
+Side panel scrapes the live DOM (content script)
+ ↓
+Layered extraction → normalized JobData
+ ↓
+Review / edit in the panel form
+ ↓
+POST /api/applications (JWT Bearer auth)
+ ↓
+Saved — appears on the dashboard (duplicates rejected by the backend)
+```
+
+## Extraction Engine
+
+`src/content/extract/pipeline.js` orchestrates the layers; first non-empty value wins per field:
 
 1. Platform detector + platform extractor (`src/content/scrapers/`)
 2. Generic extractor fallback
-3. Structured data (JSON-LD `JobPosting`: title, org, location, salary, dates)
+3. Structured data (JSON-LD `JobPosting`: title, organization, location, salary, dates)
 4. Meta/OpenGraph (company corroboration, canonical URL)
 5. DOM heuristics (labeled fields, headings, article text)
-6. Normalization (backend-enum types, work mode, canonical URL)
-7. Confidence scoring (structured 0.95 → platform 0.85 → meta 0.6 → heuristic 0.5)
+6. Normalization (backend-enum types, work mode, canonical URL, listing guard)
+7. Confidence scoring (`structured` 0.95 → `platform` 0.85 → `meta` 0.6 → `heuristic` 0.5)
 
-Supported: LinkedIn, Indeed, Naukri, Internshala, Greenhouse, Lever,
-Workday, Ashby, Google Forms (limited — form title/description only, company
-and role stay blank for review), company career pages, and generic job pages.
-A conservative listing-page guard refuses to save career indexes as jobs.
+Supported platforms: LinkedIn, Indeed, Naukri, Internshala, Greenhouse, Lever, Workday, Ashby, Wellfound, Google Forms (limited — company and role stay blank for review), company career pages, and generic job pages. A conservative listing-page guard refuses to save career indexes as jobs.
 
-The side panel also carries a self-contained injection fallback
-(`src/shared/extractFallback.js`) for tabs opened before the extension was
-loaded. The background keeps a short-lived per-tab+URL cache for instant
-paint; the content script observes SPA navigation (MutationObserver +
-history patching, debounced) and notifies the panel to rescan.
+Reliability details:
 
-## Supported platforms
+- The side panel carries a self-contained injection fallback (`src/shared/extractFallback.js`) for tabs opened before the extension was loaded.
+- The background worker keeps a short-lived per-tab+URL cache for instant paint; the content script observes SPA navigation (debounced `MutationObserver` + history patching) and notifies the panel to rescan.
+- JWT sync reads the dashboard tab's `localStorage` (content script on TrackMyHunt origins) into `chrome.storage.local`, sends it as `Authorization: Bearer`, and clears it on dashboard logout or backend 401. Logging out in the panel clears only the extension copy.
 
-- LinkedIn (`linkedin.com/jobs`)
-- Indeed (`indeed.com`)
-- Wellfound (`wellfound.com`)
-- Greenhouse (`greenhouse.io` boards)
-- Any other job page (generic title-based fallback; company/role may need a manual edit)
+## Auth & Security
 
-## Auth
+- No login of its own; no secrets in the extension (no API keys, no credentials).
+- All saves go to the configured TrackMyHunt backend with the user's JWT.
+- Never sends resume content, tokens, or page credentials anywhere except the backend API.
 
-The extension has no login of its own. It reads the website JWT from the
-dashboard tab's `localStorage` (via a content script on TrackMyHunt origins,
-with a one-shot `chrome.scripting` injection fallback for tabs that were
-already open before the extension was loaded) into `chrome.storage.local`,
-sends it as `Authorization: Bearer`, and clears it when the dashboard logs
-out or the backend returns 401. Logging out in the popup clears only the
-extension copy.
+## Configuration
 
-## Backend URLs
+Build-time `.env` (public URLs only — no secrets):
 
-Build-time configuration in `.env` (public URLs only, no secrets):
+| Variable | Purpose | Default |
+|---|---|---|
+| `VITE_BASE_BACKEND_URL` | Backend API base URL | `http://localhost:3000` (+ port 5000 fallback) |
+| `VITE_BASE_FRONTEND_URL` | Dashboard origin for token sync | `http://localhost:5173` |
 
-- `VITE_BASE_BACKEND_URL` — API base (default fallbacks: localhost:5000/3000)
-- `VITE_BASE_FRONTEND_URL` — dashboard origin for token sync (default `http://localhost:5173`)
+## Manifest (MV3)
 
-Production defaults point at the deployed Render backend and Vercel frontend.
+Side-panel entry (`index.html`), background service worker, and content scripts for dashboard auth plus job pages (LinkedIn, Indeed, Wellfound, Lever, Greenhouse, Ashby, Naukri, Internshala, Workday, Google Forms, all URLs as generic fallback). Permissions: `activeTab`, `storage`, `scripting`, `tabs`, `sidePanel`. Minimum Chrome 116.
 
-## Develop / load unpacked
+## Develop
 
 ```sh
 npm install
-npm run build
+npm run build   # → extension/dist/
+npm run lint    # oxlint
+npm test        # offline extractor tests (synthetic DOM, no network)
 ```
 
-Then in Chrome: Extensions → Developer mode → Load unpacked → `dist/`.
+Load unpacked in Chrome: Extensions → Developer mode → Load unpacked → `extension/dist/`.
 
-`npm run lint` runs oxlint.
+## Tech Stack
+
+React 19 + Vite + Tailwind CSS 3 + lucide-react, built with `@crxjs/vite-plugin`. Editor/lint type declarations via `@types/chrome`, `@types/react`, `@types/node` (dev only).
