@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { User, Lock, AlertTriangle, Save, Trash2, Bell } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { updateProfile, changePassword, deleteAccount, getReminderSettings, updateReminderSettings } from "../services/api";
-import { GoogleLogin } from "@react-oauth/google";
+import { updateProfile, changePassword, deleteAccount, getPasswordStatus, setPassword, getReminderSettings, updateReminderSettings } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import AppCard from "../components/ui/AppCard";
@@ -21,7 +20,8 @@ function Profile() {
   const [name, setName] = useState(user?.name || "");
   const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [deleteData, setDeleteData] = useState({ password: "", confirmText: "" });
-  const [needsGoogleReauth, setNeedsGoogleReauth] = useState(false);
+  const [hasPassword, setHasPassword] = useState(null);
+  const [setPw, setSetPw] = useState({ newPassword: "", confirmPassword: "" });
 
   const [reminders, setReminders] = useState(null);
   const [remindersLoading, setRemindersLoading] = useState(true);
@@ -31,6 +31,22 @@ function Profile() {
   useEffect(() => {
     if (user) setName(user.name);
   }, [user]);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchPasswordStatus() {
+      try {
+        const data = await getPasswordStatus();
+        if (active) setHasPassword(data.hasPassword !== false);
+      } catch {
+        if (active) setHasPassword(null);
+      }
+    }
+    fetchPasswordStatus();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +115,25 @@ function Profile() {
     }
   }
 
+  async function handleSetPassword(e) {
+    e.preventDefault();
+    if (setPw.newPassword !== setPw.confirmPassword) {
+      return setMessage({ type: "error", text: "Passwords do not match" });
+    }
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+    try {
+      await setPassword({ newPassword: setPw.newPassword, confirmPassword: setPw.confirmPassword });
+      setSetPw({ newPassword: "", confirmPassword: "" });
+      setHasPassword(true);
+      setMessage({ type: "success", text: "Password set successfully. You can now sign in with email and password." });
+    } catch (err) {
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleDeleteAccount(e) {
     e.preventDefault();
     if (deleteData.confirmText !== "DELETE") {
@@ -107,31 +142,8 @@ function Profile() {
     if (!window.confirm("Are you absolutely sure? This cannot be undone.")) return;
     setLoading(true);
     setMessage({ type: "", text: "" });
-    setNeedsGoogleReauth(false);
     try {
       await deleteAccount({ password: deleteData.password });
-      logout();
-      navigate("/");
-    } catch (err) {
-      if (/google re-authentication required/i.test(err.message || "")) {
-        setNeedsGoogleReauth(true);
-        setMessage({ type: "error", text: "This account uses Google sign-in. Please verify with Google below to continue deletion." });
-      } else {
-        setMessage({ type: "error", text: err.message });
-      }
-      setLoading(false);
-    }
-  }
-
-  async function handleDeleteWithGoogle(credentialResponse) {
-    if (deleteData.confirmText !== "DELETE") {
-      return setMessage({ type: "error", text: "Please type DELETE to confirm." });
-    }
-    if (!window.confirm("Are you absolutely sure? This cannot be undone.")) return;
-    setLoading(true);
-    setMessage({ type: "", text: "" });
-    try {
-      await deleteAccount({ googleToken: credentialResponse.credential });
       logout();
       navigate("/");
     } catch (err) {
@@ -163,27 +175,49 @@ function Profile() {
         </form>
       </AppCard>
 
-      <AppCard className="p-5 sm:p-6">
-        <h2 style={{ margin: "0 0 1rem", fontSize: "0.95rem", fontWeight: 700, color: "var(--text-strong)", display: "flex", alignItems: "center", gap: 8 }}>
-          <Lock size={17} style={{ color: "var(--brand)" }} /> Change password
-        </h2>
-        <form onSubmit={handleChangePassword} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Current password">
-              <TextInput type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} required />
-            </Field>
+      {hasPassword === false ? (
+        <AppCard className="p-5 sm:p-6">
+          <h2 style={{ margin: "0 0 0.4rem", fontSize: "0.95rem", fontWeight: 700, color: "var(--text-strong)", display: "flex", alignItems: "center", gap: 8 }}>
+            <Lock size={17} style={{ color: "var(--brand)" }} /> Set password
+          </h2>
+          <p style={{ margin: "0 0 1rem", fontSize: "0.82rem", color: "var(--muted)" }}>
+            Set a password to also sign in with your email and password.
+          </p>
+          <form onSubmit={handleSetPassword} className="space-y-4">
             <Field label="New password">
-              <TextInput type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} required minLength={6} />
+              <TextInput type="password" value={setPw.newPassword} onChange={(e) => setSetPw({ ...setPw, newPassword: e.target.value })} required minLength={6} />
             </Field>
-          </div>
-          <Field label="Confirm new password">
-            <TextInput type="password" value={passwords.confirmPassword} onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })} required />
-          </Field>
-          <AppButton type="submit" variant="secondary" loading={loading}>
-            <Lock size={15} /> Change password
-          </AppButton>
-        </form>
-      </AppCard>
+            <Field label="Confirm new password">
+              <TextInput type="password" value={setPw.confirmPassword} onChange={(e) => setSetPw({ ...setPw, confirmPassword: e.target.value })} required minLength={6} />
+            </Field>
+            <AppButton type="submit" variant="secondary" loading={loading}>
+              <Lock size={15} /> Set password
+            </AppButton>
+          </form>
+        </AppCard>
+      ) : (
+        <AppCard className="p-5 sm:p-6">
+          <h2 style={{ margin: "0 0 1rem", fontSize: "0.95rem", fontWeight: 700, color: "var(--text-strong)", display: "flex", alignItems: "center", gap: 8 }}>
+            <Lock size={17} style={{ color: "var(--brand)" }} /> Change password
+          </h2>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Current password">
+                <TextInput type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} required />
+              </Field>
+              <Field label="New password">
+                <TextInput type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} required minLength={6} />
+              </Field>
+            </div>
+            <Field label="Confirm new password">
+              <TextInput type="password" value={passwords.confirmPassword} onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })} required />
+            </Field>
+            <AppButton type="submit" variant="secondary" loading={loading}>
+              <Lock size={15} /> Change password
+            </AppButton>
+          </form>
+        </AppCard>
+      )}
 
       <AppCard className="p-5 sm:p-6">
         <h2 style={{ margin: "0 0 0.4rem", fontSize: "0.95rem", fontWeight: 700, color: "var(--text-strong)", display: "flex", alignItems: "center", gap: 8 }}>
@@ -307,6 +341,11 @@ function Profile() {
         <p style={{ margin: "0 0 1rem", fontSize: "0.82rem", color: "var(--muted)" }}>
           Permanently delete your account and all associated data. This action is irreversible.
         </p>
+        {hasPassword === false && (
+          <p style={{ margin: "0 0 1rem", fontSize: "0.8rem", color: "var(--muted)" }}>
+            You don&apos;t have a local password yet — set one above, then use it here to confirm deletion.
+          </p>
+        )}
         <form onSubmit={handleDeleteAccount} className="space-y-4" style={{ maxWidth: 420 }}>
           <Field label="Enter your password to confirm">
             <TextInput type="password" value={deleteData.password} onChange={(e) => setDeleteData({ ...deleteData, password: e.target.value })} required />
@@ -317,21 +356,6 @@ function Profile() {
           <AppButton type="submit" variant="danger" disabled={loading || deleteData.confirmText !== "DELETE"}>
             <Trash2 size={15} /> Delete account
           </AppButton>
-          {needsGoogleReauth && deleteData.confirmText === "DELETE" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted)" }}>
-                Or verify with the Google account you signed up with:
-              </p>
-              <GoogleLogin
-                onSuccess={handleDeleteWithGoogle}
-                onError={() => setMessage({ type: "error", text: "Google verification failed" })}
-                theme="outline"
-                shape="rect"
-                text="signin_with"
-                width="280"
-              />
-            </div>
-          )}
         </form>
       </AppCard>
     </div>

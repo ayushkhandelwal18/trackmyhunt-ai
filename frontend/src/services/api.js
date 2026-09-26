@@ -81,6 +81,14 @@ export function changePassword(data) {
   return request("PUT", "/user/password", data, true);
 }
 
+export function getPasswordStatus() {
+  return request("GET", "/user/password", null, true);
+}
+
+export function setPassword(data) {
+  return request("POST", "/user/password", data, true);
+}
+
 export function deleteAccount(data) {
   return request("DELETE", "/user/account", data, true);
 }

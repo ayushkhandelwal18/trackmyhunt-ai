@@ -18,6 +18,24 @@ exports.changePassword = async (req, res) => {
     }
 };
 
+exports.getPasswordStatus = async (req, res) => {
+    try {
+        const result = await userService.getPasswordStatus(req.user.id);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
+exports.setPassword = async (req, res) => {
+    try {
+        const result = await userService.setPassword(req.user.id, req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+};
+
 exports.deleteAccount = async (req, res) => {
     try {
         const result = await userService.deleteAccount(req.user.id, req.body);

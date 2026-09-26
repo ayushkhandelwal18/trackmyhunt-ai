@@ -1,7 +1,5 @@
 const User = require("../models/user.model");
 const bcrypt = require("bcrypt");
-const { OAuth2Client } = require("google-auth-library");
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const Application = require("../models/application.models");
 const Opportunity = require("../models/opportunity.model");
 const Skill = require("../models/skill.model");
@@ -54,36 +52,48 @@ exports.changePassword = async (userId, { currentPassword, newPassword }) => {
     return { message: "Password updated successfully" };
 };
 
-exports.deleteAccount = async (userId, { password, googleToken }) => {
+// True only for a user-set local password. Google-created accounts carry a
+// random dummy value instead of a bcrypt hash, so they fail this check.
+function hasLocalPassword(user) {
+    return typeof user.password === "string" && /^\$2[aby]?\$/.test(user.password);
+}
+
+exports.getPasswordStatus = async (userId) => {
+    const user = await User.findById(userId).select("_id password").lean();
+    if (!user) throw new Error("User not found");
+    return { hasPassword: hasLocalPassword(user) };
+};
+
+exports.setPassword = async (userId, { newPassword, confirmPassword }) => {
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
 
-    // Email/password accounts keep the existing password verification.
-    // Google-created accounts carry only a random dummy value instead of a
-    // bcrypt hash, so they verify with a fresh Google ID token instead.
-    if (typeof user.password === "string" && /^\$2[aby]?\$/.test(user.password)) {
+    // Only accounts without a real local password may create their first one.
+    if (hasLocalPassword(user)) {
+        throw new Error("Password is already set. Use change password instead.");
+    }
+    if (!newPassword || newPassword.length < 6) {
+        throw new Error("Your password must be at least 6 characters");
+    }
+    if (newPassword !== confirmPassword) {
+        throw new Error("Passwords do not match");
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return { message: "Password set successfully" };
+};
+
+exports.deleteAccount = async (userId, { password }) => {
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
+
+    
+    if (user.password) {
         if (!password) throw new Error("Password required to delete account");
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) throw new Error("Incorrect password");
-    } else {
-        if (!googleToken) throw new Error("Google re-authentication required to delete account");
-        let payload;
-        try {
-            const ticket = await googleClient.verifyIdToken({
-                idToken: googleToken,
-                audience: process.env.GOOGLE_CLIENT_ID,
-            });
-            payload = ticket.getPayload();
-        } catch (err) {
-            throw new Error("Google verification failed. Please try again.");
-        }
-        const tokenEmail = String((payload && payload.email) || "").toLowerCase();
-        if (!tokenEmail || tokenEmail !== String(user.email).toLowerCase()) {
-            throw new Error("Google account does not match this TrackMyHunt account");
-        }
-        if (user.googleId && payload.sub !== user.googleId) {
-            throw new Error("Google account does not match this TrackMyHunt account");
-        }
     }
 
     
