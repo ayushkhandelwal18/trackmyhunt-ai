@@ -1,16 +1,16 @@
 # TrackMyHunt Browser Extension
 
-The TrackMyHunt Browser Extension is an open-source productivity companion built on Chrome Manifest V3. It enables candidates to capture job postings directly from online job portals, applicant tracking systems (ATS), and company career sites into their TrackMyHunt dashboard with a single click, eliminating manual data entry and preventing duplicate applications.
+The TrackMyHunt Browser Extension is an open-source companion built on Chrome Manifest V3. It enables candidates to capture job postings directly from online job boards, applicant tracking systems (ATS), and company career portals into their TrackMyHunt dashboard with a single click, eliminating manual data entry and preventing duplicate applications.
 
 ---
 
 ## 1. Overview
 
 ### What It Does
-When browsing job postings across job boards or corporate portals, the extension side panel automatically inspects the active browser tab, parses structured metadata, extracts key job attributes, and normalizes the information into a unified application schema. Users can review, adjust, and immediately save the opportunity to their TrackMyHunt workspace without navigating away from the job posting.
+When browsing job postings across web portals, the extension side panel automatically inspects the active browser tab, parses structured metadata, extracts key job attributes, and normalizes the information into a unified application schema. Users can review, adjust, and immediately save the opportunity to their TrackMyHunt workspace without navigating away from the job posting.
 
 ### Key Capabilities
-- **Side Panel Interface**: Utilizes Chrome's native Side Panel API (`chrome.sidePanel`) to stay alongside active job listings without obscuring page content or requiring popup re-opens.
+- **Side Panel Interface**: Utilizes Chrome's native Side Panel API (`chrome.sidePanel`) to dock alongside active job listings without obscuring page content or requiring popup re-opens.
 - **Layered Multi-Tier Scraping**: Cascades through JSON-LD structured schemas, tailored platform extractors, OpenGraph/Twitter meta tags, and DOM heuristics.
 - **Listing Page Guard**: Intelligently identifies search result pages, career index directories, and non-job pages to prevent accidental saves of non-job content.
 - **Seamless Session Sync**: Detects authenticated TrackMyHunt web dashboard tabs and synchronizes JWT session tokens securely into extension local storage without manual extension logins or stored passwords.
@@ -19,120 +19,150 @@ When browsing job postings across job boards or corporate portals, the extension
 
 ---
 
-## 2. Architecture & Manifest V3 Design
+## 2. Local Development & Installation
 
-The extension strictly adheres to Chrome's Manifest V3 standard, decoupling background lifecycle events from persistent side panel rendering and DOM-isolated content scripts:
+Follow these steps to build and run the TrackMyHunt extension locally on your machine.
 
-```mermaid
-flowchart TB
-    subgraph Browser["Google Chrome Environment"]
-        subgraph ActiveTab["Active Tab (Job Portal / ATS / Careers)"]
-            DOM["Page DOM & Head Tags\n(JSON-LD, Meta, HTML)"]
-            CS_Job["Content Script (content.js)\n- Platform Detection\n- MutationObserver & History Listener\n- Layered Extraction Pipeline"]
-        end
-
-        subgraph DashboardTab["TrackMyHunt Web Tab (e.g., localhost / vercel.app)"]
-            WebStorage["localStorage.getItem('token')"]
-            CS_Auth["Content Script (dashboardAuth.js)\n- Polls Web Session\n- Dispatches trackmyhunt_job_saved"]
-        end
-
-        subgraph ExtensionWorker["Background Service Worker (background.js)"]
-            SW["Service Worker (Event Driven)\n- Tab Activation & Navigation Routing\n- In-Memory Instant Paint Cache (5m TTL)\n- Contextual Panel Closing (Chrome 141+)"]
-        end
-
-        subgraph Storage["Extension Storage"]
-            LocalStorage["chrome.storage.local\n(User JWT Token)"]
-        end
-
-        subgraph SidePanelUI["Side Panel Interface (index.html)"]
-            ReactApp["React 19 SPA\n(Vite + Tailwind CSS)\n- Scan State Machine\n- Editable Job Form\n- Duplicate Alert Modal"]
-            FallbackExtractor["Self-Contained Fallback Extractor\n(extractFallback.js)"]
-        end
-    end
-
-    subgraph BackendAPI["TrackMyHunt Backend API"]
-        PostApp["POST /api/applications\n(Authorization: Bearer <JWT>)"]
-    end
-
-    DOM <-->|Scrapes DOM & Observes Changes| CS_Job
-    CS_Job <-->|chrome.runtime.onMessage| SW
-    CS_Job <-->|Direct Tab Messaging| ReactApp
-
-    WebStorage -->|Synchronizes Token| CS_Auth
-    CS_Auth -->|chrome.storage.local.set| LocalStorage
-
-    LocalStorage -->|Reads Token| ReactApp
-    SW <-->|Tab Events & Notification| ReactApp
-    FallbackExtractor -.->|Injected if content script unready| DOM
-
-    ReactApp -->|Direct HTTPS API Save| PostApp
-    PostApp -->|HTTP 409 Duplicate or 201 Created| ReactApp
-    ReactApp -.->|Notify Save Completed| CS_Auth
-```
-
-### Manifest Component Roles
-1. **Side Panel (`index.html` / `src/App.jsx`)**: The interactive user interface built with React 19 and Tailwind CSS. It manages the form state machine (`scanning`, `ready`, `empty`, `unsupported`, `conn-error`), exposes editable fields, and surfaces extraction confidence indicators.
-2. **Background Service Worker (`src/background/background.js`)**: An ephemeral background worker that routes tab transition events, sets default side panel behavior (`openPanelOnActionClick: true`), maintains a 5-minute memory cache of parsed tabs for instant UI painting, and cleans up state on tab switches.
-3. **Job Content Script (`src/content/content.js`)**: Injected into all URLs (`<all_urls>`). Listens for extraction commands from the side panel, runs the extraction pipeline against live DOM elements, and tracks client-side SPA navigations via `MutationObserver` and History API patches.
-4. **Dashboard Auth Content Script (`src/content/dashboardAuth.js`)**: Restrictively injected only into TrackMyHunt web app origins (`localhost:5173`, `localhost`, `127.0.0.1`, and production Vercel domains). Synchronizes the web application's `localStorage` JWT token into `chrome.storage.local`.
+### Prerequisites
+- **Node.js**: `18.x` or higher
+- **npm**: `9.x` or higher
+- **Google Chrome**: Version `116` or higher (supports the Chrome Side Panel API)
 
 ---
 
-## 3. Multi-Tier Extraction Engine
-
-The core extraction pipeline (`src/content/extract/pipeline.js`) processes the active document through a multi-tier priority sequence. Fields are resolved using a **first non-empty value wins** rule based on tier reliability:
-
-```mermaid
-flowchart TD
-    Start([extractJob Triggered]) --> DetectPlatform[detectPlatform: URL Regex & DOM Signals]
-    
-    subgraph ExtractionLayers["Cascading Extraction Layers"]
-        L1["Tier 1: Structured Data (JSON-LD JobPosting schema)\nConfidence: 0.95"]
-        L2["Tier 2: Platform-Specific Scrapers (Domain Selectors)\nConfidence: 0.85"]
-        L3["Tier 3: Meta & OpenGraph Tags (og:title, og:description)\nConfidence: 0.60"]
-        L4["Tier 4: DOM Heuristic Analysis (Headings, Microdata, Semantic Tags)\nConfidence: 0.50"]
-    end
-
-    DetectPlatform --> ExtractionLayers
-    ExtractionLayers --> Merge[mergePartials: First Non-Empty Value Wins per Field]
-    
-    subgraph Normalization["Normalization & Guards"]
-        Clean[cleanCompany & cleanRole]
-        LocNorm[normalizeLocation]
-        TypeNorm["normalizeEmploymentType (Intern, Full-Time, Remote, Freelance, Other)"]
-        ModeNorm["normalizeWorkMode (Remote, Hybrid, On-site)"]
-        UrlNorm[canonicalJobUrl: Drop tracking query parameters]
-        Guard{looksLikeListingPage?}
-    end
-
-    Merge --> Clean
-    Clean --> LocNorm
-    LocNorm --> TypeNorm
-    TypeNorm --> ModeNorm
-    ModeNorm --> UrlNorm
-    UrlNorm --> Guard
-
-    Guard -->|True (Directory or Multi-Card Index)| SetFlag[Flag isListingPage: true (Prevent Save)]
-    Guard -->|False (Single Posting)| Ready[Return Normalized JobData with Confidence Scores]
-    SetFlag --> Ready
+### Step 1: Install Dependencies
+Navigate to the `extension` directory and install all required packages:
+```bash
+cd extension
+npm install
 ```
-
-### Extraction Tiers Explained
-1. **Tier 1: Structured Data (`src/content/extract/structuredData.js`)**:
-   Searches `<script type="application/ld+json">` blocks for Schema.org `JobPosting` objects. Extracts title, hiring organization, employment type, job location, base salary, and valid through dates. Highest confidence (`0.95`).
-2. **Tier 2: Platform-Specific Scrapers (`src/content/scrapers/`)**:
-   Targeted CSS and XPath selectors tailored to specific DOM structures of major recruitment platforms and applicant tracking systems.
-3. **Tier 3: Meta Tags (`src/content/extract/meta.js`)**:
-   Inspects OpenGraph (`og:title`, `og:description`), Twitter cards, and canonical URL elements. Title-splitting logic separates roles and company names formatted as `Role at Company` or `Role | Company`. Site names (e.g., "LinkedIn", "Indeed") are blocked from being mistakenly assigned as employer names.
-4. **Tier 4: DOM Heuristics (`src/content/extract/heuristics.js`)**:
-   Generic fallback that searches for semantic containers, primary `<h1>` headings, definition lists, and labeled metadata clusters.
-
-### Listing Page Guard
-A specialized verification check (`looksLikeListingPage`) evaluates page structure to protect against capturing job board homepages, search result lists, or department directories as single jobs. It counts repeating job link patterns, search bar elements, and pagination controls. If flagged, the side panel displays an informational warning asking the user to click into a specific job posting.
 
 ---
 
-## 4. Platform Coverage & Support
+### Step 2: Configure Environment Variables
+Create an `.env` file in the `extension/` directory (see [Environment Variables](#3-environment-variables--configuration) for exact details):
+```env
+VITE_BASE_BACKEND_URL=http://localhost:3000
+VITE_BASE_FRONTEND_URL=http://localhost:5173
+```
+
+---
+
+### Step 3: Build the Extension Bundle
+Compile the React 19 application and Manifest V3 assets using Vite and `@crxjs/vite-plugin`:
+```bash
+npm run build
+```
+This generates the ready-to-load extension distribution bundle inside `extension/dist/`.
+
+---
+
+### Step 4: Load Unpacked in Google Chrome
+1. Open Google Chrome and enter `chrome://extensions/` in the address bar.
+2. Enable **Developer mode** using the toggle switch in the top-right corner.
+3. Click the **Load unpacked** button in the top-left toolbar.
+4. Select the `extension/dist` folder from your local project directory.
+5. Click the puzzle icon (Extensions) in your Chrome toolbar and pin **TrackMyHunt**.
+6. Open your local TrackMyHunt web app at `http://localhost:5173` and log in.
+7. Open any supported job posting (e.g., on LinkedIn, Indeed, or Greenhouse) and click the extension icon to launch the side panel.
+
+---
+
+### Step 5: Run Offline Tests & Code Linter
+Verify extraction accuracy and code quality without running a browser:
+```bash
+# Run offline extractor test suite against synthetic DOM fixtures
+npm test
+
+# Run static analysis and linting
+npm run lint
+```
+
+---
+
+## 3. Environment Variables & Configuration
+
+The extension requires only public URLs at build time. It contains **no API keys, database secrets, or private credentials**.
+
+| Variable Name | Status | Purpose | Local Example | Production Example |
+|---|---|---|---|---|
+| `VITE_BASE_BACKEND_URL` | Required | TrackMyHunt backend API base URL where saved jobs are submitted | `http://localhost:3000` | `https://api.trackmyhunt.com` |
+| `VITE_BASE_FRONTEND_URL` | Required | Web dashboard origin used to synchronize the user's JWT session | `http://localhost:5173` | `https://trackmyhunt.vercel.app` |
+
+### Concrete `extension/.env` Example File:
+```env
+# Local Development Defaults
+VITE_BASE_BACKEND_URL=http://localhost:3000
+VITE_BASE_FRONTEND_URL=http://localhost:5173
+
+# Production Deployment (Reference)
+# VITE_BASE_BACKEND_URL=https://trackmyhunt-backend.onrender.com
+# VITE_BASE_FRONTEND_URL=https://trackmyhunt.vercel.app
+```
+
+---
+
+## 4. Architecture & Component Notes
+
+The extension strictly adheres to Chrome's Manifest V3 standard, dividing responsibilities cleanly across specialized components:
+
+### Architectural Components
+1. **Side Panel User Interface (`index.html` / `src/App.jsx`)**:
+   - Built with React 19 and Tailwind CSS 3.
+   - Manages the UI state machine across 5 phases: `scanning`, `ready`, `empty`, `unsupported`, and `conn-error`.
+   - Exposes an editable form for the candidate to review and refine job details before saving.
+   - Embeds a self-contained fallback extractor (`extractFallback.js`) for tabs opened before the extension was installed.
+2. **Background Service Worker (`src/background/background.js`)**:
+   - Acts as an event-driven hub routing tab lifecycle events.
+   - Automatically registers side panel behavior (`openPanelOnActionClick: true`).
+   - Maintains an in-memory 5-minute cache (`jobCache`) to paint previously parsed tabs instantly upon re-opening.
+   - Feature-detects `chrome.sidePanel.close` (Chrome 141+) to contextually close the side panel when the user switches to non-job tabs.
+3. **Job Content Script (`src/content/content.js`)**:
+   - Injected into all URLs (`<all_urls>`).
+   - Listens for extraction requests from the side panel and executes the multi-tier scraping pipeline against live DOM elements.
+   - Monitors dynamic SPA page changes using a debounced `MutationObserver` and History API wrappers, notifying the side panel when new jobs are selected.
+4. **Dashboard Auth Content Script (`src/content/dashboardAuth.js`)**:
+   - Strictly restricted to TrackMyHunt web app origins (`localhost:5173`, `localhost`, `127.0.0.1`, and production Vercel domains).
+   - Polls the web app's `localStorage` every 3 seconds to keep `chrome.storage.local` synchronized with the active user session.
+   - Dispatches a custom DOM event (`trackmyhunt_job_saved`) to refresh open dashboard tabs when a job is saved.
+
+---
+
+### Step-by-Step Operating Procedures
+
+#### Procedure A: Multi-Tier Job Extraction
+1. When the side panel opens or the tab navigates, `content.js` runs `extractJob()` from `pipeline.js`.
+2. **Platform Detection**: Evaluates URL patterns and DOM signatures against known portals (e.g., `linkedin.com/jobs`, `indeed.com`, `greenhouse.io`, or Google Forms).
+3. **Cascading Extraction Tiers** (First non-empty value wins per field):
+   - **Tier 1 (Structured Data)**: Extracts Schema.org `JobPosting` JSON-LD blocks (title, organization, location, salary, date). Confidence: `0.95`.
+   - **Tier 2 (Platform Scrapers)**: Uses tailored DOM selectors specific to the identified platform. Confidence: `0.85`.
+   - **Tier 3 (Meta Tags)**: Parses OpenGraph (`og:title`, `og:description`) and Twitter tags. Evaluates delimiters (`Role at Company` / `Role | Company`) and strips site names like "LinkedIn" or "Indeed" from company fields. Confidence: `0.60`.
+   - **Tier 4 (DOM Heuristics)**: Inspects primary `<h1>` headings, semantic containers, and labeled fields. Confidence: `0.50`.
+4. **Normalization**:
+   - Normalizes employment type to standard TrackMyHunt enums (`Intern`, `Full-Time`, `Remote`, `Freelance`, `Intern + Offer`, `Other`).
+   - Normalizes work mode (`Remote`, `Hybrid`, `On-site`).
+   - Strips tracking query parameters to establish a clean canonical URL.
+5. **Listing Page Guard (`looksLikeListingPage`)**: Checks for multi-card directories or search result grids. If detected, flags `isListingPage: true` and alerts the user to select an individual job posting.
+6. The resulting `JobData` object is sent to the side panel and displayed in the review form.
+
+#### Procedure B: Silent Authentication & Token Sync
+1. The user logs into the TrackMyHunt web app in any browser tab.
+2. The web app stores the JWT session token in `localStorage.setItem('token', jwt)`.
+3. `dashboardAuth.js` polls `localStorage` every 3 seconds:
+   - **Token Present**: Saves the token to `chrome.storage.local.set({ token })`.
+   - **Token Absent**: Increments a miss counter. If absent for 2 consecutive cycles (6 seconds), removes the token from `chrome.storage.local` to handle user logout or session expiration.
+4. When the side panel opens, it reads the JWT directly from `chrome.storage.local`.
+5. If no token exists, the panel displays a prompt inviting the user to open and sign into the TrackMyHunt dashboard.
+
+#### Procedure C: Saving Applications & Duplicate Detection
+1. The candidate reviews the extracted details in the side panel form and clicks **Save to TrackMyHunt**.
+2. The side panel makes an HTTPS `POST` request directly to `/api/applications` on the configured backend API, attaching `Authorization: Bearer <JWT>`.
+3. **If Unique**: The backend creates the application, returns `201 Created`, the side panel shows a green confirmation, and dispatches a notification event to any open dashboard tabs.
+4. **If Duplicate**: The backend identifies an existing record matching the normalized URL or company/role combination and returns `409 Conflict` with the duplicate payload. The side panel displays an alert linking directly to the existing application.
+
+---
+
+## 5. Platform Coverage & Support
 
 | Platform / Portal | Identifier | Detection Mechanism | Specific Elements Handled |
 |---|---|---|---|
@@ -151,100 +181,23 @@ A specialized verification check (`looksLikeListingPage`) evaluates page structu
 
 ---
 
-## 5. Authentication & Token Synchronization
+## 6. Permissions & Security Model
 
-The extension operates with zero stored user passwords or third-party API keys:
+The extension requests only the minimum necessary permissions required for side-panel operation and in-tab DOM extraction:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant WebApp as TrackMyHunt Web App (Browser Tab)
-    participant CS_Auth as dashboardAuth.js (Content Script)
-    participant Storage as chrome.storage.local
-    participant Panel as Side Panel App (App.jsx)
-    participant Backend as TrackMyHunt API (/api/applications)
+| Permission | Justification |
+|---|---|
+| `sidePanel` | Provides the side-panel user interface alongside active web pages. |
+| `activeTab` | Grants temporary read access to the currently focused tab when the user opens the side panel. |
+| `storage` | Stores the user's session token (`chrome.storage.local`) and user preferences. |
+| `scripting` | Executes fallback in-memory extraction on tabs opened prior to extension installation. |
+| `tabs` | Detects tab activation and URL changes to trigger debounced re-scans. |
+| `host_permissions` | Allows content scripts to run across recruitment sites (`https://*.linkedin.com/*`, `https://*.indeed.com/*`, etc.) and permits network calls to the configured backend API. |
 
-    User->>WebApp: Log in via Web App (Email/OTP or Google OAuth)
-    WebApp->>WebApp: Stores JWT in localStorage.setItem('token', jwt)
-    
-    loop Every 3 Seconds
-        CS_Auth->>WebApp: localStorage.getItem('token')
-        alt Token Present
-            CS_Auth->>Storage: chrome.storage.local.set({ token })
-        else Token Absent (2 Consecutive Misses)
-            CS_Auth->>Storage: chrome.storage.local.remove('token')
-        end
-    end
-
-    User->>Panel: Opens Extension on Job Tab
-    Panel->>Storage: chrome.storage.local.get(['token'])
-    Storage-->>Panel: Returns Active JWT
-
-    alt Not Authenticated
-        Panel-->>User: Displays "Sign In to TrackMyHunt" screen
-    else Authenticated
-        Panel-->>User: Shows Extracted Job Form with Save Button
-        User->>Panel: Clicks "Save to TrackMyHunt"
-        Panel->>Backend: POST /api/applications with Authorization: Bearer <JWT>
-        
-        alt Success (201 Created)
-            Backend-->>Panel: Application Created
-            Panel-->>User: Displays Green Success Indicator
-            Panel->>CS_Auth: Dispatches JOB_SAVED message
-            CS_Auth->>WebApp: Triggers DOM CustomEvent ('trackmyhunt_job_saved')
-        else Duplicate Detected (409 Conflict)
-            Backend-->>Panel: HTTP 409 Conflict { message, duplicate: {...} }
-            Panel-->>User: Displays Duplicate Warning with Existing Record Link
-        end
-    end
-```
-
-### Security Highlights
-- **No Embedded Secrets**: The extension contains no API private keys, database credentials, or secret signing keys.
-- **Strict Bearer Authorization**: Saves are executed strictly through authenticated REST calls using the user's standard JWT session token.
-- **Automatic Logout Sync**: Logging out of the TrackMyHunt web app clears `localStorage`, which automatically evicts the token from `chrome.storage.local` within 6 seconds via the consecutive-miss guard.
-
----
-
-## 6. Development & Build Setup
-
-### Prerequisites
-- Node.js `18.x` or higher
-- npm `9.x` or higher
-- Google Chrome version `116` or higher (supports `chrome.sidePanel`)
-
-### 1. Installation
-Clone the repository and install dependencies inside the `extension` folder:
-```bash
-cd extension
-npm install
-```
-
-### 2. Environment Configuration
-Create an `.env` file in the `extension/` directory (refer to the defaults below):
-```env
-# URL of your TrackMyHunt backend API
-VITE_BASE_BACKEND_URL=http://localhost:5000
-
-# URL of your TrackMyHunt web dashboard (used for session sync)
-VITE_BASE_FRONTEND_URL=http://localhost:5173
-```
-
-### 3. Build the Extension
-Compile the React application and Manifest V3 bundle using Vite and `@crxjs/vite-plugin`:
-```bash
-npm run build
-```
-This produces the distribution output in `extension/dist/`.
-
-### 4. Load Unpacked in Google Chrome
-1. Open Google Chrome and enter `chrome://extensions/` in the address bar.
-2. Toggle on **Developer mode** in the upper-right corner.
-3. Click the **Load unpacked** button.
-4. Select the `extension/dist` directory.
-5. Click the extension puzzle icon in Chrome and pin **TrackMyHunt**.
-6. Open any supported job portal (e.g., LinkedIn Jobs) and click the extension icon to launch the side panel.
+### Security Guarantees
+- **Zero Third-Party Tracking**: The extension communicates exclusively with the configured TrackMyHunt backend API and the active browser tab.
+- **No Stored Credentials**: No passwords, API keys, or private signing keys are embedded in or handled by the extension.
+- **Scoped Injection**: Authentication token reading is restricted exclusively to TrackMyHunt web app origins.
 
 ---
 
@@ -263,18 +216,3 @@ Run static analysis with oxlint:
 ```bash
 npm run lint
 ```
-
----
-
-## 8. Permissions & Chrome Manifest Details
-
-The extension requests only the minimum necessary permissions required for side-panel operation and in-tab DOM extraction:
-
-| Permission | Justification |
-|---|---|
-| `sidePanel` | Provides the side-panel user interface alongside active web pages. |
-| `activeTab` | Grants temporary read access to the currently focused tab when the user opens the side panel. |
-| `storage` | Stores user session tokens (`chrome.storage.local`) and user preferences. |
-| `scripting` | Executes fallback in-memory extraction on tabs opened prior to extension installation. |
-| `tabs` | Detects tab activation and URL changes to trigger debounced re-scans. |
-| `host_permissions` | Allows content scripts to run across recruitment sites (`https://*.linkedin.com/*`, `https://*.indeed.com/*`, etc.) and permits network calls to the configured backend API. |
