@@ -1,5 +1,7 @@
 const User = require("../models/user.model");
 const bcrypt = require("bcrypt");
+const { OAuth2Client } = require("google-auth-library");
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const Application = require("../models/application.models");
 const Opportunity = require("../models/opportunity.model");
 const Skill = require("../models/skill.model");
@@ -52,15 +54,36 @@ exports.changePassword = async (userId, { currentPassword, newPassword }) => {
     return { message: "Password updated successfully" };
 };
 
-exports.deleteAccount = async (userId, { password }) => {
+exports.deleteAccount = async (userId, { password, googleToken }) => {
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
 
-    
-    if (user.password) {
+    // Email/password accounts keep the existing password verification.
+    // Google-created accounts carry only a random dummy value instead of a
+    // bcrypt hash, so they verify with a fresh Google ID token instead.
+    if (typeof user.password === "string" && /^\$2[aby]?\$/.test(user.password)) {
         if (!password) throw new Error("Password required to delete account");
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) throw new Error("Incorrect password");
+    } else {
+        if (!googleToken) throw new Error("Google re-authentication required to delete account");
+        let payload;
+        try {
+            const ticket = await googleClient.verifyIdToken({
+                idToken: googleToken,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+            payload = ticket.getPayload();
+        } catch (err) {
+            throw new Error("Google verification failed. Please try again.");
+        }
+        const tokenEmail = String((payload && payload.email) || "").toLowerCase();
+        if (!tokenEmail || tokenEmail !== String(user.email).toLowerCase()) {
+            throw new Error("Google account does not match this TrackMyHunt account");
+        }
+        if (user.googleId && payload.sub !== user.googleId) {
+            throw new Error("Google account does not match this TrackMyHunt account");
+        }
     }
 
     

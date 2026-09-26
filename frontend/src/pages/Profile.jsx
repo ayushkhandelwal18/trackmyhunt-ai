@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { User, Lock, AlertTriangle, Save, Trash2, Bell } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { updateProfile, changePassword, deleteAccount, getReminderSettings, updateReminderSettings } from "../services/api";
+import { GoogleLogin } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import AppCard from "../components/ui/AppCard";
@@ -20,6 +21,7 @@ function Profile() {
   const [name, setName] = useState(user?.name || "");
   const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [deleteData, setDeleteData] = useState({ password: "", confirmText: "" });
+  const [needsGoogleReauth, setNeedsGoogleReauth] = useState(false);
 
   const [reminders, setReminders] = useState(null);
   const [remindersLoading, setRemindersLoading] = useState(true);
@@ -105,8 +107,31 @@ function Profile() {
     if (!window.confirm("Are you absolutely sure? This cannot be undone.")) return;
     setLoading(true);
     setMessage({ type: "", text: "" });
+    setNeedsGoogleReauth(false);
     try {
       await deleteAccount({ password: deleteData.password });
+      logout();
+      navigate("/");
+    } catch (err) {
+      if (/google re-authentication required/i.test(err.message || "")) {
+        setNeedsGoogleReauth(true);
+        setMessage({ type: "error", text: "This account uses Google sign-in. Please verify with Google below to continue deletion." });
+      } else {
+        setMessage({ type: "error", text: err.message });
+      }
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteWithGoogle(credentialResponse) {
+    if (deleteData.confirmText !== "DELETE") {
+      return setMessage({ type: "error", text: "Please type DELETE to confirm." });
+    }
+    if (!window.confirm("Are you absolutely sure? This cannot be undone.")) return;
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+    try {
+      await deleteAccount({ googleToken: credentialResponse.credential });
       logout();
       navigate("/");
     } catch (err) {
@@ -292,6 +317,21 @@ function Profile() {
           <AppButton type="submit" variant="danger" disabled={loading || deleteData.confirmText !== "DELETE"}>
             <Trash2 size={15} /> Delete account
           </AppButton>
+          {needsGoogleReauth && deleteData.confirmText === "DELETE" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--muted)" }}>
+                Or verify with the Google account you signed up with:
+              </p>
+              <GoogleLogin
+                onSuccess={handleDeleteWithGoogle}
+                onError={() => setMessage({ type: "error", text: "Google verification failed" })}
+                theme="outline"
+                shape="rect"
+                text="signin_with"
+                width="280"
+              />
+            </div>
+          )}
         </form>
       </AppCard>
     </div>

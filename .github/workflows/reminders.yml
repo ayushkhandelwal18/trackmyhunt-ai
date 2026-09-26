@@ -15,13 +15,19 @@ on:
   schedule:
     # Once every hour. The reminder service evaluates eligibility each run;
     # an email is sent only when a reminder is actually due.
-    - cron: "0 * * * *"
+   - cron: "30 * * * *"
   workflow_dispatch: # Manual run from the Actions tab for testing.
 
 jobs:
   send-reminders:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || vars.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL || vars.RESEND_FROM_EMAIL }}
+      RESEND_FROM_NAME: ${{ secrets.RESEND_FROM_NAME || vars.RESEND_FROM_NAME }}
+      CLIENT_URL: ${{ secrets.CLIENT_URL || vars.CLIENT_URL }}
     defaults:
       run:
         working-directory: backend
@@ -36,14 +42,14 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
+      - name: Skip run when database config is missing
+        if: ${{ env.DATABASE_URL == '' }}
+        run: echo "::warning::DATABASE_URL is not configured. Skipping reminder cycle."
+
       - name: Install backend dependencies
+        if: ${{ env.DATABASE_URL != '' }}
         run: npm ci
 
       - name: Run reminder cycle
+        if: ${{ env.DATABASE_URL != '' }}
         run: npm run reminders
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
-          RESEND_FROM_NAME: ${{ secrets.RESEND_FROM_NAME }}
-          CLIENT_URL: ${{ secrets.CLIENT_URL }}

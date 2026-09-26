@@ -207,6 +207,7 @@ function AuthOverlay({ onClose, initialMode = "login", isStandalone = false }) {
               <p style={{ margin: "0 0 1.25rem", fontSize: "0.85rem", color: "var(--muted)" }}>Enter the 6-digit code sent to {formData.email}.</p>
               <form onSubmit={handleOtpVerify} className="space-y-4">
                 <input type="text" name="otp" maxLength="6" value={formData.otp} onChange={handleChange} className="app-form-input" style={{ textAlign: "center", letterSpacing: "0.4em", fontFamily: "monospace", fontSize: "1.1rem" }} placeholder="000000" required />
+                <p className="text-center" style={{ margin: 0, fontSize: "0.78rem", color: "var(--muted)" }}>Didn&apos;t receive the OTP? Check your spam folder.</p>
                 <button type="submit" disabled={loading} className="app-button app-button-primary w-full">
                   {loading ? <Loader2 size={16} className="animate-spin" /> : "Verify & continue"}
                 </button>
@@ -280,6 +281,7 @@ function AuthOverlay({ onClose, initialMode = "login", isStandalone = false }) {
                 <div>
                   <label className="app-form-label">OTP</label>
                   <input type="text" name="otp" maxLength="6" value={formData.otp} onChange={handleChange} className="app-form-input" style={{ fontFamily: "monospace", letterSpacing: "0.25em" }} required />
+                  <p style={{ margin: "0.4rem 0 0", fontSize: "0.78rem", color: "var(--muted)" }}>Didn&apos;t receive the OTP? Check your spam folder.</p>
                 </div>
                 <div>
                   <label className="app-form-label">New password</label>
