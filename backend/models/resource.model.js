@@ -15,24 +15,15 @@ const resourceSchema = new mongoose.Schema(
         type: {
             type: String, 
             required: true,
-            enum: ["YouTube", "Blog", "Article", "Course", "Website"],
+            enum: ["GitHub", "YouTube", "Blog", "Article", "Course", "Website", "Documentation", "LinkedIn", "Google Drive", "Google Sheets", "PDF", "Other"],
         },
         link: {
             type: String,
             required: true,
             trim: true,
         },
-        relatedSkills: {
-            type: String, 
-        },
         description: {
             type: String,
-        },
-        status: {
-            type: String,
-            required: true,
-            enum: ["Saved", "In progress", "Completed"],
-            default: "Saved",
         },
     },
     { timestamps: true }

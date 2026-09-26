@@ -1,118 +1,141 @@
-import { useState, useEffect } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { getNotes, createNote, updateNote, deleteNote } from "../services/api";
 import NoteCard from "../components/notes/NoteCard";
 import NoteForm from "../components/notes/NoteForm";
+import AppButton from "../components/ui/AppButton";
+import PageHeader from "../components/ui/PageHeader";
+import SearchInput from "../components/ui/SearchInput";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorState from "../components/ui/ErrorState";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 function Notes() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchNotes = async () => {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  async function fetchNotes() {
     try {
       setLoading(true);
+      setError("");
       const data = await getNotes();
-      setNotes(data);
+      setNotes(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Unable to load notes.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
     fetchNotes();
   }, []);
 
-  const handleAddClick = () => {
-    setEditingNote(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (note) => {
-    setEditingNote(note);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this note?")) return;
-    try {
-      await deleteNote(id);
-      setNotes(notes.filter(n => n._id !== id));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleFormSubmit = async (formData) => {
+  async function handleFormSubmit(formData) {
     try {
       setSubmitLoading(true);
+      setFormError("");
       if (editingNote) {
         const updated = await updateNote(editingNote._id, formData);
-        setNotes(notes.map(n => n._id === updated._id ? updated : n));
+        setNotes((prev) => prev.map((n) => (n._id === updated._id ? updated : n)));
       } else {
-        const newNote = await createNote(formData);
-        setNotes([newNote, ...notes]);
+        const created = await createNote(formData);
+        setNotes((prev) => [created, ...prev]);
       }
       setIsModalOpen(false);
+      setEditingNote(null);
     } catch (err) {
-      alert(err.message);
+      setFormError(err.message || "Unable to save note.");
     } finally {
       setSubmitLoading(false);
     }
-  };
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    try {
+      setDeleteLoading(true);
+      await deleteNote(deleteTarget._id);
+      setNotes((prev) => prev.filter((n) => n._id !== deleteTarget._id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err.message || "Unable to delete note.");
+      setDeleteTarget(null);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return notes;
+    return notes.filter(
+      (n) =>
+        (n.title || "").toLowerCase().includes(query) ||
+        (n.content || "").toLowerCase().includes(query) ||
+        (n.tags || "").toLowerCase().includes(query)
+    );
+  }, [notes, searchQuery]);
 
   return (
-    <div className="space-y-8">
+    <div className="app-page">
+      <PageHeader
+        eyebrow="Capture"
+        title="Notes"
+        description="Interview takeaways, ideas, and reminders in one lightweight place."
+        action={
+          <AppButton onClick={() => { setEditingNote(null); setFormError(""); setIsModalOpen(true); }}>
+            <Plus size={16} /> Add note
+          </AppButton>
+        }
+      />
 
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">My Brain Dump</h1>
-          <p className="text-gray-400">Capture your thoughts, learnings, and experiences.</p>
+      <div className="app-toolbar">
+        <div style={{ flex: "1 1 220px", maxWidth: 360 }}>
+          <SearchInput placeholder="Search notes…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
-        <button
-          onClick={handleAddClick}
-          className="bg-amber-500 text-black px-5 py-2.5 rounded-xl font-semibold hover:bg-amber-400 transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
-        >
-          <Plus size={20} /> Add Note
-        </button>
       </div>
 
-      {/* Content */}
+      {formError && <ErrorState message={formError} />}
+
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-amber-500" size={40} />
-        </div>
+        <LoadingState rows={4} />
       ) : error ? (
-        <div className="text-red-400 bg-red-500/10 p-4 rounded-xl border border-red-500/20">
-          Error: {error}
-        </div>
-      ) : notes.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-          <p className="text-gray-500 text-lg mb-4">No notes created yet.</p>
-          <button onClick={handleAddClick} className="text-amber-500 font-medium hover:underline">Write your first note</button>
-        </div>
+        <ErrorState message="Unable to load notes right now. Please try again shortly." onRetry={fetchNotes} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={searchQuery ? "No notes match" : "No notes yet"}
+          description="Capture interview takeaways, ideas, and reminders in one place."
+          action={
+            <AppButton onClick={() => { setEditingNote(null); setIsModalOpen(true); }}>
+              <Plus size={15} /> Add note
+            </AppButton>
+          }
+        />
       ) : (
-        <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-          {notes.map(note => (
+        <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
+          {filtered.map((note) => (
             <NoteCard
               key={note._id}
               note={note}
-              onEdit={handleEditClick}
-              onDelete={handleDelete}
+              onEdit={(n) => { setEditingNote(n); setFormError(""); setIsModalOpen(true); }}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
       )}
 
-      {/* Modal */}
       <NoteForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -121,6 +144,14 @@ function Notes() {
         loading={submitLoading}
       />
 
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete note?"
+        description={`Remove ${deleteTarget?.title || "this note"}? This cannot be undone.`}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

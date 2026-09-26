@@ -12,12 +12,13 @@ const resourceRoutes = require("./routes/resource.routes");
 const noteRoutes = require("./routes/note.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const resumeRoutes = require("./routes/resume.routes");
+const aiRoutes = require("./routes/ai.routes");
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "https://trackmyhunt.vercel.app",
   "http://localhost:5173", // Common Vite development port
-  "http://localhost:3000"
+  "http://localhost:3000",
 ].filter(Boolean); // Remove undefined/null if CLIENT_URL is not set
 
 const corsOptions = {
@@ -27,7 +28,11 @@ const corsOptions = {
 
     const isAllowed = allowedOrigins.includes(origin) ||
       origin.endsWith(".vercel.app") || // Allow Vercel previews
-      origin.includes("localhost");
+      origin.includes("localhost") ||
+      // Any installed copy of the TrackMyHunt extension. Extension origins
+      // cannot be spoofed by websites, and requests still require a valid
+      // user JWT. A hardcoded extension ID breaks every dev-loaded copy.
+      origin.startsWith("chrome-extension://");
 
     if (isAllowed) {
       callback(null, true);
@@ -55,6 +60,7 @@ app.use("/api/resources", resourceRoutes);
 app.use("/api/notes", noteRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/resumes", resumeRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({ message: "API is running successfully", timestamp: new Date().toISOString() });

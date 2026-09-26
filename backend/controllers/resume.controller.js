@@ -1,4 +1,5 @@
 const Resume = require("../models/resume.model");
+const Application = require("../models/application.models");
 
 // Add a new resume link
 exports.addResume = async (req, res) => {
@@ -39,11 +40,11 @@ exports.updateResume = async (req, res) => {
             return res.status(401).json({ message: "Not authorized to update this resume" });
         }
 
-        resume = await Resume.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true,
-            useFindAndModify: false,
-        });
+        const { title, link, description } = req.body || {};
+        if (title !== undefined) resume.title = title;
+        if (link !== undefined) resume.link = link;
+        if (description !== undefined) resume.description = description;
+        await resume.save();
 
         res.status(200).json({
             success: true,
@@ -83,6 +84,13 @@ exports.deleteResume = async (req, res) => {
         }
 
         await resume.deleteOne();
+
+        // Detach the deleted resume from any applications that referenced it.
+        // Applications stay intact; they simply become unmapped.
+        await Application.updateMany(
+            { user: req.user.id, resumeId: resume._id },
+            { $set: { resumeId: null } }
+        );
 
         res.status(200).json({
             success: true,

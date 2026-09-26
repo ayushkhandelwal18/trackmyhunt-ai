@@ -6,6 +6,8 @@ const Skill = require("../models/skill.model");
 const Resource = require("../models/resource.model");
 const Note = require("../models/note.model");
 const Resume = require("../models/resume.model");
+const Reminder = require("../models/reminder.model");
+const { normalizeSettings } = require("../utils/reminders");
 
 exports.updateProfile = async (userId, { name }) => {
     const user = await User.findById(userId);
@@ -15,6 +17,24 @@ exports.updateProfile = async (userId, { name }) => {
     await user.save();
 
     return { id: user._id, name: user.name, email: user.email };
+};
+
+exports.getReminderSettings = async (userId) => {
+    const user = await User.findById(userId).select("reminderSettings").lean();
+    if (!user) throw new Error("User not found");
+    return normalizeSettings(user.reminderSettings);
+};
+
+exports.updateReminderSettings = async (userId, input) => {
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
+
+    // Server-side validation; normalizeSettings throws on unreasonable values.
+    const settings = normalizeSettings(input);
+    user.reminderSettings = settings;
+    await user.save();
+
+    return normalizeSettings(user.reminderSettings);
 };
 
 exports.changePassword = async (userId, { currentPassword, newPassword }) => {
@@ -51,6 +71,7 @@ exports.deleteAccount = async (userId, { password }) => {
         Resource.deleteMany({ userId }),
         Note.deleteMany({ userId }),
         Resume.deleteMany({ userId }),
+        Reminder.deleteMany({ user: userId }),
         User.findByIdAndDelete(userId),
     ]);
 

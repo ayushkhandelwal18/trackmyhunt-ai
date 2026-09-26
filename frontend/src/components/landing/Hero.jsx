@@ -1,49 +1,45 @@
 import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import dashboard from "../../assets/dashboardpreview.png"
+import dashboardPreview from "../../assets/image.png";
 
 function Hero() {
   const { isAuthenticated } = useAuth();
   return (
-
-    <section id="home" className="pt-32 pb-24 bg-[#0f172a]">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-
-        {/* Left Content */}
+    <section id="home" className="landing-section" style={{ paddingTop: "clamp(2.5rem, 5vw, 4rem)" }}>
+      <div className="landing-container grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
         <div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-200 leading-tight">
-            Track Your <span className="text-amber-400">Job Hunt</span>.
-            <br />Plan Your Future. Get Hired.
+          <p className="section-kicker"><span className="dot" /> Job-search command center</p>
+          <h1 className="mt-4" style={{ fontSize: "clamp(2.1rem, 4.4vw, 3.1rem)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, color: "var(--text-strong)" }}>
+            Your entire job hunt, organized in one place.
           </h1>
-
-          <p className="mt-6 text-gray-400 max-w-xl">
-            Manage job applications, upcoming opportunities, skills, and career resources
-            in one organized dashboard built for students and developers.
+          <p className="section-copy mt-4" style={{ maxWidth: "34rem" }}>
+            Track applications, manage your opportunities, analyze your resume against job
+            descriptions, and stay on top of every deadline.
           </p>
-
-          <div className="mt-8 flex gap-4">
-            <Link
-              to={isAuthenticated ? "/dashboard" : "/auth"}
-              className="bg-amber-500 text-black px-6 py-3 rounded-md font-medium hover:bg-amber-400 transition"
-            >
-              Get Started
+          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+            <Link to={isAuthenticated ? "/dashboard" : "/auth"} className="app-button app-button-primary" style={{ minHeight: 44, padding: "0.7rem 1.4rem" }}>
+              Start Tracking <ArrowRight size={16} />
             </Link>
-            <a
-              href="#features"
-              className="border border-gray-600 text-gray-300 px-6 py-3 rounded-md hover:border-amber-400 hover:text-amber-400 transition"
-            >
-              View Features
+            <a href="#features" className="app-button app-button-secondary" style={{ minHeight: 44, padding: "0.7rem 1.4rem" }}>
+              Explore Features
             </a>
+          </div>
+          <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm" style={{ color: "var(--muted)" }}>
+            <span><strong style={{ color: "var(--text-strong)" }}>Kanban</strong> pipeline</span>
+            <span><strong style={{ color: "var(--text-strong)" }}>AI</strong> resume analysis</span>
+            <span><strong style={{ color: "var(--text-strong)" }}>Free</strong> for job seekers</span>
           </div>
         </div>
 
-        
-        <div className="bg-[#1e293b] rounded-xl h-80 flex items-center justify-center text-gray-500 p-1">
-          <img
-            src={dashboard}
-            alt="Dashboard preview"
-            className="w-full h-full object-contain rounded-lg border-2 border-amber-400 shadow-lg shadow-amber-400"
-          />
+        <div className="landing-card overflow-hidden">
+          <div className="flex items-center gap-2 border-b px-4 py-2.5 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted)", background: "var(--surface-2)" }}>
+            <span style={{ height: 8, width: 8, borderRadius: 999, background: "var(--border-strong)" }} />
+            <span style={{ height: 8, width: 8, borderRadius: 999, background: "var(--border-strong)" }} />
+            <span style={{ height: 8, width: 8, borderRadius: 999, background: "var(--brand)" }} />
+            <span className="ml-2 min-w-0 truncate" style={{ fontWeight: 600 }}>trackmyhunt / dashboard</span>
+          </div>
+          <img src={dashboardPreview} alt="TrackMyHunt dashboard showing tracked applications" className="h-auto w-full" loading="lazy" />
         </div>
       </div>
     </section>

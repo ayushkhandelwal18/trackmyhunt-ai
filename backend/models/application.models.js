@@ -55,6 +55,34 @@ const applicationSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    resumeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Resume",
+      default: null,
+    },
+    // Optional per-status details (interview / OA / rejection).
+    // Absent on older documents; absence means "no extra info".
+    statusDetails: {
+      interview: {
+        date: { type: Date },
+        time: { type: String, trim: true },
+        type: {
+          type: String,
+          enum: ["Technical", "HR", "Behavioral", "Managerial", "Other"],
+        },
+        link: { type: String, trim: true },
+        notes: { type: String, trim: true },
+      },
+      oa: {
+        date: { type: Date },
+        link: { type: String, trim: true },
+        notes: { type: String, trim: true },
+      },
+      rejection: {
+        date: { type: Date },
+        reason: { type: String, trim: true },
+      },
+    },
   },
   { timestamps: true }
 );

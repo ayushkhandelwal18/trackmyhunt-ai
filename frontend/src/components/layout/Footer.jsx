@@ -1,79 +1,54 @@
+import { Github, Mail, Crosshair } from "lucide-react";
 import { Link } from "react-router-dom";
+import { TRACKMYHUNT_EXTENSION_GITHUB_URL } from "../../config/landingConfig";
 
 function Footer() {
   return (
-    <footer className="bg-[#0f172a] border-t border-gray-700/50 py-12">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
-
-       
+    <footer style={{ borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
+      <div className="landing-container grid gap-6 py-8 md:grid-cols-[1.4fr_1fr_1fr] md:gap-8 md:py-10">
         <div>
-          <h3 className="text-xl font-bold text-gray-200">
-            TrackMy<span className="text-amber-400">Hunt</span>
-          </h3>
-          <p className="mt-3 text-gray-400 text-sm max-w-xs">
-            A personal job-hunt management platform to track applications, plan opportunities,
-            and stay prepared for your career journey.
+          <div className="flex items-center gap-2">
+            <span style={{ display: "grid", placeItems: "center", height: 26, width: 26, borderRadius: 8, background: "var(--brand)", color: "#fff" }}>
+              <Crosshair size={14} />
+            </span>
+            <span style={{ fontWeight: 800, color: "var(--text-strong)" }}>TrackMyHunt</span>
+          </div>
+          <p className="mt-3 max-w-xs text-sm leading-6" style={{ color: "var(--muted)" }}>
+            A focused job-search workspace for students. Track applications, analyze your resume against job descriptions, and stay on top of every deadline.
           </p>
         </div>
-
-       
         <div>
-          <h4 className="text-gray-200 font-semibold mb-4">Quick Links</h4>
-          <ul className="space-y-2 text-sm">
-            <li>
-              <a href="#home" className="text-gray-400 hover:text-amber-400 transition">
-                Home
-              </a>
-            </li>
-            <li>
-              <a href="#features" className="text-gray-400 hover:text-amber-400 transition">
-                Features
-              </a>
-            </li>
-            <li>
-              <a href="#howitworks" className="text-gray-400 hover:text-amber-400 transition">
-                How It Works
-              </a>
-            </li>
-            <li>
-              <Link to="/auth" className="text-gray-400 hover:text-amber-400 transition">
-                Login / Signup
-              </Link>
-            </li>
+          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-strong)" }}>Product</h4>
+          <ul className="space-y-2.5 text-sm" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            <li><a href="#features" style={{ color: "var(--muted)" }}>Features</a></li>
+            <li><a href="#analyzer" style={{ color: "var(--muted)" }}>AI Resume Analyzer</a></li>
+            <li><a href="#howitworks" style={{ color: "var(--muted)" }}>How it works</a></li>
+            <li><a href="#stories" style={{ color: "var(--muted)" }}>Testimonials</a></li>
+            <li><Link to="/auth" style={{ color: "var(--muted)" }}>Login / Signup</Link></li>
           </ul>
         </div>
-
-     
         <div>
-          <h4 className="text-gray-200 font-semibold mb-4">Connect with me (Give your feedback)</h4>
-          <ul className="space-y-2 text-sm text-gray-400">
-            <li>Email: ayushdev186@gmail.com</li>
+          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-strong)" }}>Connect</h4>
+          <ul className="space-y-2.5 text-sm" style={{ listStyle: "none", margin: 0, padding: 0, color: "var(--muted)" }}>
             <li>
-              <a
-                href="https://x.com/ak_h2518"
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-amber-400 transition"
-              >
-                X(Twitter)
+              <a href="mailto:ayushdev186@gmail.com" style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--muted)" }}>
+                <Mail size={14} /> ayushdev186@gmail.com
               </a>
             </li>
-            {/* <li>
-              <a
-                href="ayushdev186@gmail.com"
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-amber-400 transition"
-              >
-                LinkedIn
+            <li>
+              <a href={TRACKMYHUNT_EXTENSION_GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--muted)" }}>
+                <Github size={14} /> Extension on GitHub
               </a>
-            </li> */}
+            </li>
+            <li>
+              <a href="https://x.com/ak_h2518" target="_blank" rel="noopener noreferrer" style={{ color: "var(--muted)" }}>
+                X / Twitter
+              </a>
+            </li>
           </ul>
         </div>
       </div>
-
-      
-      <div className="mt-10 text-center text-gray-500 text-sm">
+      <div className="landing-container border-t py-5 text-sm" style={{ borderColor: "var(--border)", color: "var(--faint)" }}>
         © {new Date().getFullYear()} TrackMyHunt. All rights reserved.
       </div>
     </footer>

@@ -46,6 +46,8 @@ export function AuthProvider({ children }) {
     );
 }
 
+// The provider and its hook intentionally share this context module.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     const context = useContext(AuthContext);
     if (!context) {

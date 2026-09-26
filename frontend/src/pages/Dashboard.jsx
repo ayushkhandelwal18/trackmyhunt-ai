@@ -1,231 +1,378 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  Briefcase, Calendar, XCircle, Clock,
-  TrendingUp, ExternalLink, Plus,
-  ArrowRight, Loader2, Zap, FileText
+  Briefcase,
+  CalendarCheck,
+  Clock,
+  XCircle,
+  FileText,
+  ArrowRight,
+  Plus,
+  Zap,
+  ExternalLink,
 } from "lucide-react";
-import { getDashboardStats } from "../services/api";
+import { getDashboardStats, getApplications } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import PageHeader from "../components/ui/PageHeader";
+import AppButton from "../components/ui/AppButton";
+import AppCard from "../components/ui/AppCard";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorState from "../components/ui/ErrorState";
+import StatusBadge from "../components/ui/StatusBadge";
+import { formatShortDate, formatTime, parseDateInput, startOfToday } from "../utils/datetime";
+
+const PIPELINE = ["Applied", "Resume Shortlisted", "OA Done", "Interview Scheduled", "Interview Done", "Rejected"];
 
 function Dashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
+  const [statusBreakdown, setStatusBreakdown] = useState({});
+  const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchStats = async () => {
+    let active = true;
+    async function fetchStats() {
       try {
         setLoading(true);
-        const data = await getDashboardStats();
+        setError("");
+        const [data, apps] = await Promise.all([getDashboardStats(), getApplications()]);
+        if (!active) return;
         setStats(data);
+        const list = Array.isArray(apps) ? apps : [];
+        setApplications(list);
+        const breakdown = {};
+        list.forEach((app) => {
+          const key = app.status || "Other";
+          breakdown[key] = (breakdown[key] || 0) + 1;
+        });
+        setStatusBreakdown(breakdown);
       } catch (err) {
-        setError(err.message);
+        if (active) setError(err.message || "Unable to load dashboard.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
-    };
+    }
     fetchStats();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  if (loading) return (
-    <div className="flex justify-center py-20">
-      <Loader2 className="animate-spin text-amber-500" size={40} />
-    </div>
-  );
+  const pipelineCounts = useMemo(() => {
+    if (!stats) return [];
+    const total = Math.max(stats.counts?.total || 0, 1);
+    return PIPELINE.map((status) => {
+      const value = statusBreakdown[status] || 0;
+      return { status, value, share: Math.round((value / total) * 100) };
+    }).filter((row) => row.value > 0 || ["Applied", "Interview Scheduled", "Rejected"].includes(row.status));
+  }, [stats, statusBreakdown]);
 
-  if (error) return (
-    <div className="text-red-400 bg-red-500/10 p-4 rounded-xl border border-red-500/20">
-      Error: {error}
-    </div>
-  );
+  const upcomingInterviews = useMemo(() => {
+    const today = startOfToday();
+    return applications
+      .filter((app) => {
+        if (app.status !== "Interview Scheduled") return false;
+        const date = parseDateInput(app.statusDetails?.interview?.date);
+        return date && date >= today;
+      })
+      .sort((a, b) => parseDateInput(a.statusDetails.interview.date) - parseDateInput(b.statusDetails.interview.date))
+      .slice(0, 4);
+  }, [applications]);
+
+  const skillEntries = useMemo(() => {
+    if (!stats?.skillStats) return [];
+    const total = Object.values(stats.skillStats).reduce((sum, n) => sum + (Number(n) || 0), 0) || 1;
+    return ["Expert", "Advanced", "Intermediate", "Beginner"].map((level) => ({
+      level,
+      count: stats.skillStats[level] || 0,
+      share: Math.round(((stats.skillStats[level] || 0) / total) * 100),
+    }));
+  }, [stats]);
+
+  const firstName = (user?.name || "").split(" ")[0] || "there";
+
+  if (loading) {
+    return (
+      <div className="app-page">
+        <LoadingState rows={5} />
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="app-page">
+        <PageHeader eyebrow="Overview" title="Dashboard" description="Your job hunt at a glance." />
+        <ErrorState message="Unable to load your dashboard right now. Please try again shortly." onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
+    <div className="app-page">
+      <PageHeader
+        eyebrow="Overview"
+        title={`Good to see you, ${firstName}`}
+        description="Here's what's happening with your job hunt."
+        action={
+          <AppButton onClick={() => navigate("/applications")}>
+            <Plus size={16} /> Add application
+          </AppButton>
+        }
+      />
 
-      {/* 1. Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        <SummaryCard
-          title="Total Applications"
-          count={stats.counts.total}
-          icon={<Briefcase size={20} />}
-          color="bg-blue-500/10 text-blue-500 border-blue-500/20"
-        />
-        <SummaryCard
-          title="Interviews"
-          count={stats.counts.interview}
-          icon={<Calendar size={20} />}
-          color="bg-amber-500/10 text-amber-500 border-amber-500/20"
-        />
-        <SummaryCard
-          title="Pending Actions"
-          count={stats.counts.pending}
-          icon={<Clock size={20} />}
-          color="bg-purple-500/10 text-purple-500 border-purple-500/20"
-        />
-        <SummaryCard
-          title="Rejections"
-          count={stats.counts.rejected}
-          icon={<XCircle size={20} />}
-          color="bg-red-500/10 text-red-500 border-red-500/20"
-        />
-        <SummaryCard
-          title="Resumes Saved"
-          count={stats.counts.resumes}
-          icon={<FileText size={20} />}
-          color="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-        />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <MetricCard title="Total applications" value={stats.counts.total} icon={<Briefcase size={17} />} />
+        <MetricCard title="Interviews" value={stats.counts.interview} icon={<CalendarCheck size={17} />} />
+        <MetricCard title="Pending actions" value={stats.counts.pending} icon={<Clock size={17} />} />
+        <MetricCard title="Rejections" value={stats.counts.rejected} icon={<XCircle size={17} />} />
+        <MetricCard title="Resumes saved" value={stats.counts.resumes} icon={<FileText size={17} />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
+        <div className="space-y-4">
+          <AppCard className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--text-strong)" }}>
+                Application pipeline
+              </h2>
+              <Link
+                to="/applications"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.78rem", color: "var(--muted)" }}
+              >
+                View all <ArrowRight size={14} />
+              </Link>
+            </div>
+            {pipelineCounts.length === 0 ? (
+              <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--muted)" }}>No pipeline data yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {pipelineCounts.map((row) => (
+                  <div key={row.status} className="flex items-center gap-3">
+                    <span style={{ width: 148, fontSize: "0.78rem", color: "var(--muted)" }} className="hidden sm:block">
+                      {row.status}
+                    </span>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 8,
+                        borderRadius: 999,
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div style={{ width: `${row.share}%`, height: "100%", background: "var(--brand)" }} />
+                    </div>
+                    <span style={{ width: 56, textAlign: "right", fontSize: "0.8rem", fontWeight: 700, color: "var(--text-strong)" }}>
+                      {row.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </AppCard>
 
-        {/* 2. Recent Activity (Applications) */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-100 flex items-center gap-2">
-              <TrendingUp size={20} className="text-amber-500" /> Recent Applications
-            </h2>
-            <Link to="/applications" className="text-sm text-gray-400 hover:text-white flex items-center gap-1 transition">
-              View All <ArrowRight size={14} />
-            </Link>
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--text-strong)" }}>
+                Recent applications
+              </h2>
+              <Link to="/applications" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.78rem", color: "var(--muted)" }}>
+                View all <ArrowRight size={14} />
+              </Link>
+            </div>
+            <AppCard style={{ overflow: "hidden" }}>
+              {stats.recentApplications.length === 0 ? (
+                <div style={{ padding: "0.5rem" }}>
+                  <EmptyState
+                    title="No applications yet"
+                    description="Start tracking the roles you're applying to."
+                    action={
+                      <AppButton onClick={() => navigate("/applications")}>
+                        <Plus size={15} /> Add application
+                      </AppButton>
+                    }
+                  />
+                </div>
+              ) : (
+                <div>
+                  {stats.recentApplications.map((app, index) => (
+                    <div
+                      key={app._id}
+                      className="flex items-center justify-between gap-3"
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderTop: index === 0 ? "0" : "1px solid var(--border)",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 650, color: "var(--text-strong)", fontSize: "0.88rem" }} className="truncate">
+                          {app.company}
+                        </div>
+                        <div style={{ fontSize: "0.8rem", color: "var(--muted)" }} className="truncate">
+                          {app.role}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: "0.72rem", color: "var(--faint)", marginBottom: 4 }}>
+                          {app.updatedAt ? new Date(app.updatedAt).toLocaleDateString() : ""}
+                        </div>
+                        <StatusBadge status={app.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AppCard>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <AppCard className="p-5">
+            <h3 style={{ margin: "0 0 0.8rem", display: "flex", alignItems: "center", gap: 8, fontSize: "0.92rem", fontWeight: 700, color: "var(--text-strong)" }}>
+              <Zap size={16} style={{ color: "var(--brand)" }} /> Quick actions
+            </h3>
+            <div className="grid gap-2">
+              <AppButton onClick={() => navigate("/applications")} className="w-full">
+                <Plus size={15} /> Add application
+              </AppButton>
+              <AppButton variant="secondary" onClick={() => navigate("/opportunities")} className="w-full">
+                Add opportunity
+              </AppButton>
+              <AppButton variant="secondary" onClick={() => navigate("/notes")} className="w-full">
+                Add note
+              </AppButton>
+              <AppButton variant="secondary" onClick={() => navigate("/resumes")} className="w-full">
+                Add resume
+              </AppButton>
+            </div>
+          </AppCard>
+
+          <div>
+            <h3 style={{ margin: "0 0 0.7rem", fontSize: "0.92rem", fontWeight: 700, color: "var(--text-strong)" }}>
+              Upcoming interviews
+            </h3>
+            {upcomingInterviews.length === 0 ? (
+              <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--faint)" }}>No upcoming interviews.</p>
+            ) : (
+              <div className="space-y-2">
+                {upcomingInterviews.map((app) => {
+                  const interview = app.statusDetails?.interview || {};
+                  const when = [formatShortDate(interview.date), formatTime(interview.time)].filter(Boolean).join(" · ");
+                  return (
+                    <div key={app._id} className="app-card flex items-center justify-between gap-2 p-3">
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-strong)" }} className="truncate">
+                          {app.company}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--muted)" }} className="truncate">
+                          {[app.role, interview.type ? `${interview.type} interview` : "", when].filter(Boolean).join(" · ")}
+                        </div>
+                      </div>
+                      {interview.link && (
+                        <a href={interview.link} target="_blank" rel="noopener noreferrer" className="app-icon-button" aria-label={`Join interview for ${app.company}`} title="Join interview">
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="bg-[#1e293b] border border-gray-700/50 rounded-xl overflow-hidden">
-            {stats.recentApplications.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">No applications yet.</div>
+          <div>
+            <h3 style={{ margin: "0 0 0.7rem", fontSize: "0.92rem", fontWeight: 700, color: "var(--text-strong)" }}>
+              Upcoming opportunities
+            </h3>
+            {stats.upcomingOpportunities.length === 0 ? (
+              <EmptyState
+                title="Nothing upcoming"
+                description="Add opportunities to keep track of what's next."
+                action={
+                  <Link to="/opportunities" className="app-button app-button-secondary">
+                    Add opportunity
+                  </Link>
+                }
+              />
             ) : (
-              <div className="divide-y divide-gray-700/50">
-                {stats.recentApplications.map(app => (
-                  <div key={app._id} className="p-4 flex justify-between items-center hover:bg-gray-800/30 transition">
-                    <div>
-                      <h4 className="font-semibold text-gray-200">{app.company}</h4>
-                      <p className="text-sm text-gray-400">{app.role}</p>
+              <div className="space-y-2">
+                {stats.upcomingOpportunities.map((opp) => (
+                  <div key={opp._id} className="app-card flex items-center justify-between p-3">
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-strong)" }} className="truncate">
+                        {opp.company}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                        {opp.openingMonth} {opp.openingYear}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs text-gray-500 block mb-1">
-                        {new Date(app.updatedAt).toLocaleDateString()}
-                      </span>
-                      <StatusBadge status={app.status} />
-                    </div>
+                    {opp.link && (
+                      <a href={opp.link} target="_blank" rel="noopener noreferrer" className="app-icon-button" aria-label={`Open ${opp.company} link`}>
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
 
-        {/* 3. Side Column: Actions & Skills & Upcoming */}
-        <div className="space-y-8">
-
-          {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20 rounded-xl p-6">
-            <h3 className="font-bold text-lg text-gray-100 mb-4 flex items-center gap-2">
-              <Zap size={18} className="text-amber-400" /> Quick Actions
-            </h3>
-            <div className="space-y-3">
-              <Link to="/applications" className="block w-full text-center py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-sm font-medium border border-gray-700">
-                + Add Application
-              </Link>
-              <Link to="/opportunities" className="block w-full text-center py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-sm font-medium border border-gray-700">
-                + Add Opportunity
-              </Link>
-              <Link to="/notes" className="block w-full text-center py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-sm font-medium border border-gray-700">
-                + Add Note
-              </Link>
-              <Link to="/resumes" className="block w-full text-center py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition text-sm font-medium border border-gray-700">
-                + Add Resume
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 style={{ margin: 0, fontSize: "0.92rem", fontWeight: 700, color: "var(--text-strong)" }}>Skill snapshot</h3>
+              <Link to="/skillboard" style={{ fontSize: "0.76rem", color: "var(--brand)", fontWeight: 600 }}>
+                View skillboard
               </Link>
             </div>
-          </div>
-
-          {/* Upcoming/Shortlist Check */}
-          {/* Simplified for now as just a list of upcoming opportunities or high priority items */}
-          <div>
-            <h3 className="font-bold text-gray-100 mb-4">Upcoming Opportunities</h3>
-            <div className="space-y-3">
-              {stats.upcomingOpportunities.length === 0 ? (
-                <p className="text-sm text-gray-500 italic">No upcoming opportunities.</p>
-              ) : (
-                stats.upcomingOpportunities.map(opp => (
-                  <div key={opp._id} className="bg-[#1e293b] border border-gray-700/50 p-3 rounded-lg flex justify-between items-center group hover:border-amber-500/30 transition">
-                    <div>
-                      <div className="font-medium text-gray-300 group-hover:text-amber-400 transition">{opp.company}</div>
-                      <div className="text-xs text-gray-500">{opp.openingMonth} {opp.openingYear}</div>
-                    </div>
-                    {opp.link && (
-                      <a href={opp.link} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white">
-                        <ExternalLink size={14} />
-                      </a>
-                    )}
+            <AppCard className="space-y-3 p-4">
+              {skillEntries.map((row) => (
+                <div key={row.level} className="flex items-center gap-3">
+                  <span style={{ width: 88, fontSize: "0.75rem", color: "var(--muted)" }}>{row.level}</span>
+                  <div style={{ flex: 1, height: 6, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
+                    <div style={{ width: `${row.share}%`, height: "100%", background: "var(--brand)" }} />
                   </div>
-                ))
-              )}
-            </div>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-strong)", width: 20, textAlign: "right" }}>
+                    {row.count}
+                  </span>
+                </div>
+              ))}
+            </AppCard>
           </div>
-
-          {/* Skill Snapshot (Compact) */}
-          <div>
-            <h3 className="font-bold text-gray-100 mb-4">Skill Snapshot</h3>
-            <div className="bg-[#1e293b] border border-gray-700/50 p-4 rounded-xl space-y-3">
-              <SkillBar label="Expert" count={stats.skillStats["Expert"] || 0} color="bg-green-500" />
-              <SkillBar label="Advanced" count={stats.skillStats["Advanced"] || 0} color="bg-orange-500" />
-              <SkillBar label="Intermediate" count={stats.skillStats["Intermediate"] || 0} color="bg-yellow-500" />
-              <SkillBar label="Beginner" count={stats.skillStats["Beginner"] || 0} color="bg-blue-500" />
-            </div>
-          </div>
-
         </div>
-
       </div>
     </div>
   );
 }
 
-// Sub-components for cleaner code
-function SummaryCard({ title, count, icon, color }) {
+function MetricCard({ title, value, icon }) {
   return (
-    <div className={`p-6 rounded-xl border ${color.replace("text-", "border-").split(" ")[2]} bg-[#1e293b] relative overflow-hidden group hover:scale-[1.02] transition-transform`}>
-      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition transform scale-150`}>
+    <AppCard className="p-4">
+      <div
+        style={{
+          display: "grid",
+          placeItems: "center",
+          height: 32,
+          width: 32,
+          borderRadius: 8,
+          background: "var(--brand-soft)",
+          border: "1px solid var(--brand-border)",
+          color: "var(--brand)",
+          marginBottom: "0.7rem",
+        }}
+      >
         {icon}
       </div>
-      <div className="relative z-10">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${color}`}>
-          {icon}
-        </div>
-        <h3 className="text-3xl font-bold text-gray-100">{count}</h3>
-        <p className="text-sm text-gray-400 font-medium">{title}</p>
+      <div style={{ fontSize: "1.45rem", fontWeight: 750, letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1 }}>
+        {value ?? 0}
       </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const colors = {
-    "Applied": "text-blue-400 bg-blue-500/10",
-    "Resume Shortlisted": "text-purple-400 bg-purple-500/10",
-    "OA Done": "text-cyan-400 bg-cyan-500/10",
-    "Interview Scheduled": "text-yellow-400 bg-yellow-500/10",
-    "Interview Done": "text-orange-400 bg-orange-500/10",
-    "Rejected": "text-red-400 bg-red-500/10",
-  };
-  return (
-    <span className={`px-2 py-1 rounded text-xs font-medium ${colors[status] || "text-gray-400 bg-gray-500/10"}`}>
-      {status}
-    </span>
-  );
-}
-
-function SkillBar({ label, count, color }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-gray-400 w-20">{label}</span>
-      <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} rounded-full`}
-          style={{ width: `${Math.min(count * 10, 100)}%` }} // Arbitrary scaling for visual
-        ></div>
-      </div>
-      <span className="text-xs font-bold text-gray-300">{count}</span>
-    </div>
+      <div style={{ marginTop: 4, fontSize: "0.75rem", fontWeight: 500, color: "var(--muted)" }}>{title}</div>
+    </AppCard>
   );
 }
 

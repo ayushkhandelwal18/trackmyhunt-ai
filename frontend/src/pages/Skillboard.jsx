@@ -1,135 +1,163 @@
-import { useState, useEffect } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { getSkills, createSkill, updateSkill, deleteSkill } from "../services/api";
 import SkillCard from "../components/skills/SkillCard";
 import SkillForm from "../components/skills/SkillForm";
+import AppButton from "../components/ui/AppButton";
+import PageHeader from "../components/ui/PageHeader";
+import SearchInput from "../components/ui/SearchInput";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorState from "../components/ui/ErrorState";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+
+const CATEGORIES = ["All", "Frontend", "Backend", "Tools", "Soft Skills", "Other"];
 
 function Skillboard() {
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSkill, setEditingSkill] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchSkills = async () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [category, setCategory] = useState("All");
+
+  async function fetchSkills() {
     try {
       setLoading(true);
+      setError("");
       const data = await getSkills();
-      setSkills(data);
+      setSkills(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Unable to load skills.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
     fetchSkills();
   }, []);
 
-  const handleAddClick = () => {
-    setEditingSkill(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (skill) => {
-    setEditingSkill(skill);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this skill?")) return;
-    try {
-      await deleteSkill(id);
-      setSkills(skills.filter(s => s._id !== id));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleFormSubmit = async (formData) => {
+  async function handleFormSubmit(formData) {
     try {
       setSubmitLoading(true);
+      setFormError("");
       if (editingSkill) {
         const updated = await updateSkill(editingSkill._id, formData);
-        setSkills(skills.map(s => s._id === updated._id ? updated : s));
+        setSkills((prev) => prev.map((s) => (s._id === updated._id ? updated : s)));
       } else {
-        const newSkill = await createSkill(formData);
-        setSkills([newSkill, ...skills]);
+        const created = await createSkill(formData);
+        setSkills((prev) => [created, ...prev]);
       }
       setIsModalOpen(false);
+      setEditingSkill(null);
     } catch (err) {
-      alert(err.message);
+      setFormError(err.message || "Unable to save skill.");
     } finally {
       setSubmitLoading(false);
     }
-  };
+  }
 
-  // Group skills by category
-  const categories = ["Frontend", "Backend", "Tools", "Soft Skills", "Other"];
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    try {
+      setDeleteLoading(true);
+      await deleteSkill(deleteTarget._id);
+      setSkills((prev) => prev.filter((s) => s._id !== deleteTarget._id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err.message || "Unable to delete skill.");
+      setDeleteTarget(null);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
-  const getSkillsByCategory = (cat) => skills.filter(s => s.category === cat);
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return skills.filter((s) => {
+      const matchesQuery = !query || (s.name || "").toLowerCase().includes(query);
+      const matchesCat = category === "All" || s.category === category;
+      return matchesQuery && matchesCat;
+    });
+  }, [skills, searchQuery, category]);
+
+  const grouped = useMemo(() => {
+    const cats = category === "All" ? ["Frontend", "Backend", "Tools", "Soft Skills", "Other"] : [category];
+    return cats
+      .map((cat) => ({ cat, items: filtered.filter((s) => s.category === cat) }))
+      .filter((group) => group.items.length > 0);
+  }, [filtered, category]);
 
   return (
-    <div className="space-y-8">
+    <div className="app-page">
+      <PageHeader
+        eyebrow="Growth"
+        title="Skillboard"
+        description="Track what you're learning and where you want to improve."
+        action={
+          <AppButton onClick={() => { setEditingSkill(null); setFormError(""); setIsModalOpen(true); }}>
+            <Plus size={16} /> Add skill
+          </AppButton>
+        }
+      />
 
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Skillboard</h1>
-          <p className="text-gray-400">Track your technical growth and self-improvement plan.</p>
+      <div className="app-toolbar">
+        <div style={{ flex: "1 1 220px", maxWidth: 360 }}>
+          <SearchInput placeholder="Search skills…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
-        <button
-          onClick={handleAddClick}
-          className="bg-amber-500 text-black px-5 py-2.5 rounded-xl font-semibold hover:bg-amber-400 transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
-        >
-          <Plus size={20} /> Add Skill
-        </button>
+        <select value={category} onChange={(e) => setCategory(e.target.value)} className="app-select-inline" aria-label="Filter by category">
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>{c === "All" ? "All categories" : c}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-amber-500" size={40} />
-        </div>
-      ) : error ? (
-        <div className="text-red-400 bg-red-500/10 p-4 rounded-xl border border-red-500/20">
-          Error: {error}
-        </div>
-      ) : skills.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-          <p className="text-gray-500 text-lg mb-4">No skills tracked yet.</p>
-          <button onClick={handleAddClick} className="text-amber-500 font-medium hover:underline">Add your first skill</button>
-        </div>
-      ) : (
-        <div className="space-y-10">
-          {categories.map(cat => {
-            const catSkills = getSkillsByCategory(cat);
-            if (catSkills.length === 0) return null;
+      {formError && <ErrorState message={formError} />}
 
-            return (
-              <div key={cat}>
-                <h2 className="text-xl font-bold text-gray-200 mb-4 border-b border-gray-700/50 pb-2">{cat}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {catSkills.map(skill => (
-                    <SkillCard
-                      key={skill._id}
-                      skill={skill}
-                      onEdit={handleEditClick}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
+      {loading ? (
+        <LoadingState rows={4} />
+      ) : error ? (
+        <ErrorState message="Unable to load skills right now. Please try again shortly." onRetry={fetchSkills} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No skills found"
+          description="Build a focused list of skills you want to practice and improve."
+          action={
+            <AppButton onClick={() => { setEditingSkill(null); setIsModalOpen(true); }}>
+              <Plus size={15} /> Add skill
+            </AppButton>
+          }
+        />
+      ) : (
+        <div className="space-y-7">
+          {grouped.map((group) => (
+            <section key={group.cat}>
+              <h2 style={{ margin: "0 0 0.8rem", fontSize: "0.72rem", fontWeight: 750, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)" }}>
+                {group.cat} · {group.items.length}
+              </h2>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {group.items.map((skill) => (
+                  <SkillCard
+                    key={skill._id}
+                    skill={skill}
+                    onEdit={(s) => { setEditingSkill(s); setFormError(""); setIsModalOpen(true); }}
+                    onDelete={setDeleteTarget}
+                  />
+                ))}
               </div>
-            )
-          })}
+            </section>
+          ))}
         </div>
       )}
 
-      {/* Modal */}
       <SkillForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -138,6 +166,14 @@ function Skillboard() {
         loading={submitLoading}
       />
 
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete skill?"
+        description={`Remove ${deleteTarget?.name || "this skill"} from your skillboard?`}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

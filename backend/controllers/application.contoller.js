@@ -8,6 +8,15 @@ exports.create = async (req, res) => {
     );
     res.status(201).json(app);
   } catch (err) {
+    // Duplicate job for this user: return the existing application so the
+    // client can show it instead of creating a second record. Nothing is
+    // modified or deleted.
+    if (err.status === 409 && err.duplicate) {
+      return res.status(409).json({
+        message: err.message,
+        duplicate: err.duplicate,
+      });
+    }
     res.status(400).json({ message: err.message });
   }
 };
@@ -41,6 +50,18 @@ exports.remove = async (req, res) => {
       req.user._id
     );
     res.json({ message: "Application deleted" });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+exports.events = async (req, res) => {
+  try {
+    const events = await applicationService.getApplicationEvents(
+      req.params.id,
+      req.user._id
+    );
+    res.json(events);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

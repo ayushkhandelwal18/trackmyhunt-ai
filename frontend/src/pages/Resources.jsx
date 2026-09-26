@@ -1,122 +1,142 @@
-import { useState, useEffect } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { getResources, createResource, updateResource, deleteResource } from "../services/api";
 import ResourceCard from "../components/resources/ResourceCard";
 import ResourceForm from "../components/resources/ResourceForm";
+import AppButton from "../components/ui/AppButton";
+import PageHeader from "../components/ui/PageHeader";
+import SearchInput from "../components/ui/SearchInput";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorState from "../components/ui/ErrorState";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 function Resources() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingResource, setEditingResource] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchResources = async () => {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  async function fetchResources() {
     try {
       setLoading(true);
+      setError("");
       const data = await getResources();
-      setResources(data);
+      setResources(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Unable to load resources.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
     fetchResources();
   }, []);
 
-  const handleAddClick = () => {
-    setEditingResource(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (res) => {
-    setEditingResource(res);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this resource?")) return;
-    try {
-      await deleteResource(id);
-      setResources(resources.filter(r => r._id !== id));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleFormSubmit = async (formData) => {
+  async function handleFormSubmit(formData) {
     try {
       setSubmitLoading(true);
+      setFormError("");
       if (editingResource) {
         const updated = await updateResource(editingResource._id, formData);
-        setResources(resources.map(r => r._id === updated._id ? updated : r));
+        setResources((prev) => prev.map((r) => (r._id === updated._id ? updated : r)));
       } else {
-        const newRes = await createResource(formData);
-        setResources([newRes, ...resources]);
+        const created = await createResource(formData);
+        setResources((prev) => [created, ...prev]);
       }
       setIsModalOpen(false);
+      setEditingResource(null);
     } catch (err) {
-      alert(err.message);
+      setFormError(err.message || "Unable to save resource.");
     } finally {
       setSubmitLoading(false);
     }
-  };
+  }
 
-  // Group by Status for better organization? Or maybe just Type? 
-  // Let's stick to a simple grid for now, maybe grouped by Status if there are many.
-  // Actually, a Masonry or simple grid layout works best for resources.
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    try {
+      setDeleteLoading(true);
+      await deleteResource(deleteTarget._id);
+      setResources((prev) => prev.filter((r) => r._id !== deleteTarget._id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err.message || "Unable to delete resource.");
+      setDeleteTarget(null);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return resources.filter((r) => {
+      if (!query) return true;
+      return (
+        (r.title || "").toLowerCase().includes(query) ||
+        (r.description || "").toLowerCase().includes(query) ||
+        (r.type || "").toLowerCase().includes(query)
+      );
+    });
+  }, [resources, searchQuery]);
 
   return (
-    <div className="space-y-8">
+    <div className="app-page">
+      <PageHeader
+        eyebrow="Library"
+        title="Resources"
+        description="Save any useful link — repos, docs, videos, sheets, posts, and more."
+        action={
+          <AppButton onClick={() => { setEditingResource(null); setFormError(""); setIsModalOpen(true); }}>
+            <Plus size={16} /> Add resource
+          </AppButton>
+        }
+      />
 
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Resources</h1>
-          <p className="text-gray-400">Your personal library of learning materials.</p>
+      <div className="app-toolbar">
+        <div style={{ flex: "1 1 220px", maxWidth: 360 }}>
+          <SearchInput placeholder="Search title, type, or description…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
-        <button
-          onClick={handleAddClick}
-          className="bg-amber-500 text-black px-5 py-2.5 rounded-xl font-semibold hover:bg-amber-400 transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
-        >
-          <Plus size={20} /> Add Resource
-        </button>
       </div>
 
-      {/* Content */}
+      {formError && <ErrorState message={formError} />}
+
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-amber-500" size={40} />
-        </div>
+        <LoadingState rows={4} />
       ) : error ? (
-        <div className="text-red-400 bg-red-500/10 p-4 rounded-xl border border-red-500/20">
-          Error: {error}
-        </div>
-      ) : resources.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-          <p className="text-gray-500 text-lg mb-4">No resources saved yet.</p>
-          <button onClick={handleAddClick} className="text-amber-500 font-medium hover:underline">Add your first resource</button>
-        </div>
+        <ErrorState message="Unable to load resources right now. Please try again shortly." onRetry={fetchResources} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No resources found"
+          description="Keep the articles, guides, and references that help your search moving."
+          action={
+            <AppButton onClick={() => { setEditingResource(null); setIsModalOpen(true); }}>
+              <Plus size={15} /> Add resource
+            </AppButton>
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {resources.map(res => (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((res) => (
             <ResourceCard
               key={res._id}
               resource={res}
-              onEdit={handleEditClick}
-              onDelete={handleDelete}
+              onEdit={(r) => { setEditingResource(r); setFormError(""); setIsModalOpen(true); }}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
       )}
 
-      {/* Modal */}
       <ResourceForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -125,6 +145,14 @@ function Resources() {
         loading={submitLoading}
       />
 
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete resource?"
+        description={`Remove ${deleteTarget?.title || "this resource"}? This cannot be undone.`}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

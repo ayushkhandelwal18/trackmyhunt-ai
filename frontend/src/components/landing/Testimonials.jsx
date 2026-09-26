@@ -1,50 +1,46 @@
+import { Quote } from "lucide-react";
+
+// Placeholder sample quotes. Replace each `quote` with the student's actual
+// feedback before publishing — no verified testimonial text exists yet.
+// Only this array needs to change; the layout stays the same.
+const TESTIMONIALS = [
+  {
+    name: "Keshab Kashyap",
+    detail: "B.Tech CSE — IIIT Kota",
+    quote: "Sample student feedback — replace this with Keshab's actual feedback before publishing.",
+  },
+  {
+    name: "Arthav Jain",
+    detail: "B.Tech ECE — IIIT Kota",
+    quote: "Sample student feedback — replace this with Arthav's actual feedback before publishing.",
+  },
+  {
+    name: "N.S. Santosh",
+    detail: "B.Tech ECE — IIIT Kota",
+    quote: "Sample student feedback — replace this with Santosh's actual feedback before publishing.",
+  },
+];
+
 function Testimonials() {
-  const reviews = [
-    {
-      name: "Aman Verma",
-      role: "Final Year CS Student",
-      quote:
-        "TrackMyHunt helped me stop missing follow-ups. I finally had a clear view of all my applications.",
-    },
-    {
-      name: "Priya Singh",
-      role: "SDE Intern",
-      quote:
-        "The opportunities planner made my prep month-wise. I felt more confident before hiring season.",
-    },
-    {
-      name: "Rohit Saini",
-      role: "Backend Developer",
-      quote:
-        "Saving resources and notes in one place changed how I prepare for interviews.",
-    },
-
-  ];
-
   return (
-    <section id="testimonials" className="py-24 bg-[#0f172a]">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-200">
-            What Students Say
-          </h2>
-          <p className="mt-4 text-gray-400 max-w-2xl mx-auto">
-            Real feedback from students using TrackMyHunt to organize their job search.
-          </p>
+    <section id="stories" className="landing-section" aria-labelledby="stories-heading" style={{ paddingTop: 0 }}>
+      <div className="landing-container">
+        <div className="mx-auto mb-6 max-w-2xl text-center">
+          <p className="section-kicker"><span className="dot" /> Testimonials</p>
+          <h2 id="stories-heading" className="section-title mt-3">What Students Say</h2>
         </div>
-
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {reviews.map((item, idx) => (
-            <div
-              key={idx}
-              className="bg-[#1e293b] p-6 rounded-xl border border-gray-700/60 hover:border-amber-400 transition"
-            >
-              <p className="text-gray-400 mb-4">“{item.quote}”</p>
-              <h4 className="text-gray-200 font-semibold">{item.name}</h4>
-              <span className="text-sm text-gray-500">{item.role}</span>
-            </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {TESTIMONIALS.map((item) => (
+            <figure key={item.name} className="landing-card flex h-full flex-col p-5" style={{ margin: 0 }}>
+              <Quote size={18} style={{ color: "var(--brand)" }} aria-hidden="true" />
+              <blockquote className="mt-3 flex-1" style={{ margin: "0.75rem 0 0", fontSize: "0.86rem", lineHeight: 1.65, color: "var(--text)" }}>
+                &ldquo;{item.quote}&rdquo;
+              </blockquote>
+              <figcaption className="mt-4 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+                <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 700, color: "var(--text-strong)" }}>{item.name}</p>
+                <p style={{ margin: "2px 0 0", fontSize: "0.75rem", color: "var(--muted)" }}>{item.detail}</p>
+              </figcaption>
+            </figure>
           ))}
         </div>
       </div>

@@ -12,9 +12,12 @@ function getToken() {
 }
 // Generic request handler
 async function request(method, endpoint, data = null, isAuth = false) {
-  const headers = {
-    "Content-Type": "application/json",
-  };
+  const isForm = typeof FormData !== "undefined" && data instanceof FormData;
+  const headers = {};
+  // FormData sets its own multipart Content-Type with boundary.
+  if (!isForm) {
+    headers["Content-Type"] = "application/json";
+  }
 
   // Attach token if route is protected
   if (isAuth) {
@@ -30,14 +33,17 @@ async function request(method, endpoint, data = null, isAuth = false) {
   };
 
   if (data) {
-    config.body = JSON.stringify(data);
+    config.body = isForm ? data : JSON.stringify(data);
   }
 
   const res = await fetch(`${BASE_URL}${endpoint}`, config);
   const result = await res.json();
 
   if (!res.ok) {
-    throw new Error(result.error || "Something went wrong");
+    const error = new Error(result.message || result.error || "Something went wrong");
+    error.status = res.status;
+    if (result.duplicate) error.duplicate = result.duplicate;
+    throw error;
   }
 
   return result;
@@ -79,6 +85,14 @@ export function deleteAccount(data) {
   return request("DELETE", "/user/account", data, true);
 }
 
+export function getReminderSettings() {
+  return request("GET", "/user/reminders", null, true);
+}
+
+export function updateReminderSettings(data) {
+  return request("PUT", "/user/reminders", data, true);
+}
+
 //resend otp 
 export function resendOtp(email) {
   return request("POST", "/auth/resend-otp", { email });
@@ -109,6 +123,10 @@ export function updateApplication(id, data) {
 
 export function deleteApplication(id) {
   return request("DELETE", `/applications/${id}`, null, true);
+}
+
+export function getApplicationEvents(id) {
+  return request("GET", `/applications/${id}/events`, null, true);
 }
 
 //
@@ -212,4 +230,15 @@ export function deleteResume(id) {
 
 export function updateResume(id, data) {
   return request("PUT", `/resumes/${id}`, data, true);
+}
+
+//
+// AI RESUME & JD ANALYZER (Protected)
+//
+export function analyzeApplication(data) {
+  return request("POST", "/ai/analyze", data, true);
+}
+
+export function analyzeApplicationUpload(formData) {
+  return request("POST", "/ai/analyze", formData, true);
 }

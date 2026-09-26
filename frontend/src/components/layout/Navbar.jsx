@@ -1,107 +1,109 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { User, LogOut, Menu, X } from "lucide-react";
+import { Menu, X, Github, Crosshair } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { landingNavigation, TRACKMYHUNT_EXTENSION_GITHUB_URL } from "../../config/landingConfig";
+import ThemeToggle from "../ui/ThemeToggle";
 
 function Navbar({ openAuth }) {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  return (
-    <nav className="fixed top-0 left-0 w-full bg-[#0f172a] border-b border-gray-700/50 z-50">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+  function closeMenu() {
+    setIsOpen(false);
+  }
 
-        
-        <Link to="/" className="text-xl font-bold tracking-wide text-gray-200" onClick={() => setIsOpen(false)}>
-          TrackMy<span className="text-amber-400">Hunt</span>
+  useEffect(() => {
+    function handleKey(event) {
+      if (event.key === "Escape") closeMenu();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, []);
+
+  return (
+    <nav className="landing-nav">
+      <div className="landing-container flex min-h-[56px] items-center justify-between gap-3 md:min-h-[64px]">
+        <Link to="/" className="flex items-center gap-2" onClick={closeMenu} aria-label="TrackMyHunt home">
+          <span style={{ display: "grid", placeItems: "center", height: 28, width: 28, borderRadius: 8, background: "var(--brand)", color: "#fff" }}>
+            <Crosshair size={15} />
+          </span>
+          <span style={{ fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-strong)" }}>TrackMyHunt</span>
         </Link>
 
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium">
-          <a href="#home" className="text-gray-300 hover:text-amber-400 transition">
-            Home
-          </a>
-          <a href="#features" className="text-gray-300 hover:text-amber-400 transition">
-            Features
-          </a>
+        <div className="hidden items-center gap-6 text-sm md:flex">
+          {landingNavigation.map((item) => (
+            <a key={item.href} href={item.href} style={{ color: "var(--muted)", fontWeight: 500 }}>
+              {item.label}
+            </a>
+          ))}
+        </div>
 
-          <a href="#howitworks" className="text-gray-300 hover:text-amber-400 transition">
-            How It Works
+        <div className="hidden items-center gap-2 md:flex">
+          <a
+            href={TRACKMYHUNT_EXTENSION_GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="app-icon-button"
+            title="Chrome Extension on GitHub"
+            aria-label="Chrome Extension on GitHub"
+          >
+            <Github size={17} />
           </a>
-          <a href="#cta" className="text-gray-300 hover:text-amber-400 transition">
-            Get Started
-          </a>
-
-
+          <ThemeToggle />
           {user ? (
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="flex items-center gap-2 text-gray-300 hover:text-white transition cursor-pointer">
-                <div className="bg-amber-500/20 p-2 rounded-full text-amber-500">
-                  <User size={18} />
-                </div>
-                <span className="font-semibold text-amber-400">{user.name}</span>
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="app-button app-button-secondary">
+                Open dashboard
               </Link>
-              <button
-                onClick={logout}
-                className="text-gray-400 hover:text-red-400 transition"
-                title="Logout"
-              >
-                <LogOut size={18} />
+              <button type="button" onClick={logout} className="app-button app-button-ghost">
+                Logout
               </button>
             </div>
           ) : (
-            <button onClick={openAuth} className="bg-amber-500 text-black px-4 py-2 rounded-md hover:bg-amber-400 transition"
-            >
+            <button type="button" onClick={openAuth} className="app-button app-button-primary">
               Login / Signup
             </button>
           )}
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="md:hidden">
-          <button onClick={() => setIsOpen(!isOpen)} className="text-gray-300 hover:text-white focus:outline-none">
-            {isOpen ? <X size={24} /> : <Menu size={24} />}
+        <div className="flex items-center gap-1 md:hidden">
+          <ThemeToggle />
+          <button type="button" onClick={() => setIsOpen(!isOpen)} aria-label={isOpen ? "Close menu" : "Open menu"} aria-expanded={isOpen} className="app-icon-button">
+            {isOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
       {isOpen && (
-        <div className="md:hidden bg-[#0f172a] border-b border-gray-700/50 px-6 py-4 space-y-4 shadow-xl">
-          <a href="#home" onClick={() => setIsOpen(false)} className="block text-gray-300 hover:text-amber-400 transition text-sm font-medium">
-            Home
-          </a>
-          <a href="#features" onClick={() => setIsOpen(false)} className="block text-gray-300 hover:text-amber-400 transition text-sm font-medium">
-            Features
-          </a>
-          <a href="#howitworks" onClick={() => setIsOpen(false)} className="block text-gray-300 hover:text-amber-400 transition text-sm font-medium">
-            How It Works
-          </a>
-          <a href="#cta" onClick={() => setIsOpen(false)} className="block text-gray-300 hover:text-amber-400 transition text-sm font-medium">
-            Get Started
-          </a>
-
-          <div className="border-t border-gray-700 pt-4">
-            {user ? (
-              <div className="space-y-4">
-                <Link to="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center gap-3 text-gray-300 hover:text-white transition">
-                  <div className="bg-amber-500/20 p-2 rounded-full text-amber-500">
-                    <User size={18} />
-                  </div>
-                  <span className="font-semibold text-amber-400">{user.name}</span>
-                </Link>
-                <button
-                  onClick={() => { logout(); setIsOpen(false); }}
-                  className="flex items-center gap-2 text-gray-400 hover:text-red-400 transition text-sm"
-                >
-                  <LogOut size={18} /> Logout
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => { openAuth(); setIsOpen(false); }}
-                className="w-full bg-amber-500 text-black px-4 py-2 rounded-md hover:bg-amber-400 transition font-medium"
+        <div className="border-t px-5 py-4 md:hidden" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+          <div className="grid gap-1">
+            {landingNavigation.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={closeMenu}
+                className="app-nav-link"
               >
+                {item.label}
+              </a>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+            <a href={TRACKMYHUNT_EXTENSION_GITHUB_URL} target="_blank" rel="noopener noreferrer" className="app-button app-button-secondary w-full">
+              <Github size={15} /> Extension on GitHub
+            </a>
+            {user ? (
+              <>
+                <Link to="/dashboard" onClick={closeMenu} className="app-button app-button-primary w-full">
+                  Open dashboard
+                </Link>
+                <button type="button" onClick={() => { logout(); closeMenu(); }} className="app-button app-button-ghost w-full">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => { openAuth(); closeMenu(); }} className="app-button app-button-primary w-full">
                 Login / Signup
               </button>
             )}

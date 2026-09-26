@@ -16,6 +16,11 @@ const resumeSchema = new mongoose.Schema({
         required: [true, "Please provide a link to your resume"],
         trim: true,
     },
+    description: {
+        type: String,
+        trim: true,
+        default: "",
+    },
     createdAt: {
         type: Date,
         default: Date.now,

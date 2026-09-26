@@ -1,49 +1,74 @@
-import { useState } from "react";
-import { Outlet, Navigate } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 import { useAuth } from "../../context/AuthContext";
+import LoadingState from "../ui/LoadingState";
 
 function ProtectedLayout() {
-    const { isAuthenticated, loading } = useAuth();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
 
-    if (loading) return <div className="min-h-screen bg-[#020617] flex items-center justify-center text-amber-500">Loading...</div>;
+  // Close the mobile drawer on route change (covers programmatic navigation).
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
 
-    if (!isAuthenticated) return <Navigate to="/" replace />;
+  // Close the mobile drawer with Escape.
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    function handleKey(event) {
+      if (event.key === "Escape") setIsSidebarOpen(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [isSidebarOpen]);
 
+  // Lock body scroll while the mobile drawer is open.
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isSidebarOpen]);
+
+  if (loading) {
     return (
-        <div className="flex min-h-screen bg-[#020617] text-gray-100 font-poppins relative">
-
-            {/* Mobile Sidebar Toggle */}
-            <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="md:hidden fixed top-4 right-4 z-40 bg-amber-500 text-black p-2 rounded-lg shadow-lg"
-            >
-                <Menu size={24} />
-            </button>
-
-            {/* Sidebar - Fixed width */}
-            
-            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-
-            {/* Overlay for mobile when sidebar is open */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
-                    onClick={() => setIsSidebarOpen(false)}
-                ></div>
-            )}
-
-            {/* Main Content Area */}
-            
-            <div className="flex-1 md:ml-64 p-8 overflow-y-auto w-full transition-all duration-300">
-                <div className="max-w-7xl mx-auto">
-                    <Outlet />
-                </div>
-            </div>
+      <div className="app-shell flex min-h-screen items-center justify-center p-6">
+        <div style={{ width: "min(100%, 480px)" }}>
+          <LoadingState rows={3} />
         </div>
+      </div>
     );
+  }
+
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+
+  return (
+    <div className="app-shell relative flex min-h-screen">
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col md:ml-[248px]">
+        <TopBar onMenuClick={() => setIsSidebarOpen(true)} />
+        <main className="app-main">
+          <div className="app-content">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 export default ProtectedLayout;

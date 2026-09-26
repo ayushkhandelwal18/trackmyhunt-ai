@@ -34,6 +34,33 @@ const userSchema = new mongoose.Schema({
 
     otp: String,
     otpExpires: Date,
+
+    reminderSettings: {
+        emailReminders: {
+            type: Boolean,
+            default: false,
+        },
+        followupReminders: {
+            type: Boolean,
+            default: true,
+        },
+        followupAfterDays: {
+            type: Number,
+            default: 7,
+        },
+        minPendingApplications: {
+            type: Number,
+            default: 3,
+        },
+        interviewReminders: {
+            type: Boolean,
+            default: true,
+        },
+        interviewReminderHours: {
+            type: Number,
+            default: 24,
+        },
+    },
 },
     { timestamps: true }
 );

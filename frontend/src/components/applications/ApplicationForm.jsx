@@ -1,212 +1,202 @@
-import { useState, useEffect } from "react";
-import { X, Save, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import Modal from "../ui/Modal";
+import AppButton from "../ui/AppButton";
+import { Field, TextInput, Select, Textarea } from "../ui/FormField";
+import ResumePicker from "./ResumePicker";
+import QuickAddResumeModal from "./QuickAddResumeModal";
+import StatusDetailsFields from "./StatusDetailsFields";
+import { getResumes } from "../../services/api";
+import { toDateInputValue } from "../../utils/datetime";
+
+const TYPES = ["Intern", "Full-Time", "Remote", "Freelance", "Intern + Offer", "Other"];
+const STATUSES = ["Applied", "Resume Shortlisted", "OA Done", "Interview Scheduled", "Interview Done", "Rejected", "Other"];
+
+function emptyForm() {
+  return {
+    company: "",
+    role: "",
+    type: "Full-Time",
+    status: "Applied",
+    applicationLink: "",
+    skills: "",
+    notes: "",
+    appliedDate: new Date().toISOString().split("T")[0],
+    resumeId: "",
+    statusDetails: { interview: {}, oa: {}, rejection: {} },
+  };
+}
+
+function toStatusDetails(value) {
+  const base = { interview: {}, oa: {}, rejection: {} };
+  if (!value || typeof value !== "object") return base;
+  const pick = (group, keys) => {
+    const source = value[group] || {};
+    const out = {};
+    keys.forEach((key) => {
+      if (key === "date") {
+        out.date = toDateInputValue(source.date);
+      } else if (source[key] != null) {
+        out[key] = String(source[key]);
+      } else {
+        out[key] = "";
+      }
+    });
+    return out;
+  };
+  return {
+    interview: pick("interview", ["date", "time", "type", "link", "notes"]),
+    oa: pick("oa", ["date", "link", "notes"]),
+    rejection: pick("rejection", ["date", "reason"]),
+  };
+}
+
+function toResumeId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return value._id || "";
+  return "";
+}
 
 function ApplicationForm({ isOpen, onClose, onSubmit, initialData = null, loading }) {
-    const [formData, setFormData] = useState({
-        company: "",
-        role: "",
-        type: "Full-Time",
-        status: "Applied",
-        applicationLink: "",
-        skills: "",
-        notes: "",
-        appliedDate: new Date().toISOString().split("T")[0],
-    });
+  const [formData, setFormData] = useState(emptyForm());
+  const [resumes, setResumes] = useState([]);
+  const [resumesLoading, setResumesLoading] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
-    useEffect(() => {
-        if (initialData) {
-            setFormData({
-                ...initialData,
-                appliedDate: initialData.appliedDate ? initialData.appliedDate.split("T")[0] : new Date().toISOString().split("T")[0],
-            });
-        } else {
-            // Reset form for new entry
-            setFormData({
-                company: "",
-                role: "",
-                type: "Full-Time",
-                status: "Applied",
-                applicationLink: "",
-                skills: "",
-                notes: "",
-                appliedDate: new Date().toISOString().split("T")[0],
-            })
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialData) {
+      setFormData({
+        ...emptyForm(),
+        ...initialData,
+        resumeId: toResumeId(initialData.resumeId),
+        statusDetails: toStatusDetails(initialData.statusDetails),
+        appliedDate: initialData.appliedDate ? initialData.appliedDate.split("T")[0] : new Date().toISOString().split("T")[0],
+      });
+    } else {
+      setFormData(emptyForm());
+    }
+    setShowQuickAdd(false);
+
+    let active = true;
+    async function loadResumes() {
+      try {
+        setResumesLoading(true);
+        const data = await getResumes();
+        const list = Array.isArray(data?.resumes) ? data.resumes : Array.isArray(data) ? data : [];
+        if (active) setResumes(list);
+      } catch {
+        if (active) setResumes([]);
+      } finally {
+        if (active) setResumesLoading(false);
+      }
+    }
+    loadResumes();
+    return () => {
+      active = false;
+    };
+  }, [initialData, isOpen]);
+
+  function handleChange(e) {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    onSubmit({ ...formData, resumeId: formData.resumeId || null });
+  }
+
+  function handleQuickAddSaved(resume) {
+    setResumes((prev) => (prev.some((r) => r._id === resume._id) ? prev : [resume, ...prev]));
+    setFormData((prev) => ({ ...prev, resumeId: resume._id }));
+  }
+
+  const resumeStale = Boolean(formData.resumeId) && !resumesLoading && !resumes.some((r) => r._id === formData.resumeId);
+
+  return (
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={initialData ? "Edit application" : "Add application"}
+        size="max-w-2xl"
+        footer={
+          <>
+            <AppButton variant="secondary" onClick={onClose} disabled={loading}>
+              Cancel
+            </AppButton>
+            <AppButton loading={loading} onClick={handleSubmit}>
+              {initialData ? "Update application" : "Save application"}
+            </AppButton>
+          </>
         }
-    }, [initialData, isOpen]);
+      >
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Company" required>
+            <TextInput name="company" required value={formData.company} onChange={handleChange} placeholder="e.g. Google" />
+          </Field>
+          <Field label="Role" required>
+            <TextInput name="role" required value={formData.role} onChange={handleChange} placeholder="e.g. Frontend Engineer" />
+          </Field>
+          <Field label="Type">
+            <Select name="type" value={formData.type} onChange={handleChange}>
+              {TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Status">
+            <Select name="status" value={formData.status} onChange={handleChange}>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
+          </Field>
+          <StatusDetailsFields
+            status={formData.status}
+            details={formData.statusDetails || {}}
+            onChange={(statusDetails) => setFormData((prev) => ({ ...prev, statusDetails }))}
+          />
+          <Field label="Applied date">
+            <TextInput type="date" name="appliedDate" required value={formData.appliedDate} onChange={handleChange} />
+          </Field>
+          <Field label="Application link">
+            <TextInput type="url" name="applicationLink" value={formData.applicationLink} onChange={handleChange} placeholder="https://…" />
+          </Field>
+          <div className="md:col-span-2">
+            <Field label="Resume used" hint="Optional — pick a saved resume or add one without leaving this form.">
+              <ResumePicker
+                resumes={resumes}
+                loading={resumesLoading}
+                value={formData.resumeId}
+                stale={resumeStale}
+                onChange={(value) => setFormData((prev) => ({ ...prev, resumeId: value }))}
+                onAddClick={() => setShowQuickAdd(true)}
+              />
+            </Field>
+          </div>
+          <div className="md:col-span-2">
+            <Field label="Skills" hint="Comma separated">
+              <TextInput name="skills" value={formData.skills} onChange={handleChange} placeholder="React, Node.js…" />
+            </Field>
+          </div>
+          <div className="md:col-span-2">
+            <Field label="Notes">
+              <Textarea name="notes" rows={3} value={formData.notes} onChange={handleChange} placeholder="Any additional details…" />
+            </Field>
+          </div>
+        </form>
+      </Modal>
 
-    if (!isOpen) return null;
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onSubmit(formData);
-    };
-
-    return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-[#1e293b] w-full max-w-2xl rounded-2xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-
-                
-                <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-[#0f172a]">
-                    <h2 className="text-xl font-bold text-gray-100">
-                        {initialData ? "Edit Application" : "Add New Application"}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition">
-                        <X size={24} />
-                    </button>
-                </div>
-
-                
-                <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-                    <form id="app-form" onSubmit={handleSubmit} className="space-y-6">
-
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Company Name *</label>
-                                <input
-                                    type="text"
-                                    name="company"
-                                    required
-                                    value={formData.company}
-                                    onChange={handleChange}
-                                    placeholder="e.g. Google, Amazon"
-                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Role / Position *</label>
-                                <input
-                                    type="text"
-                                    name="role"
-                                    required
-                                    value={formData.role}
-                                    onChange={handleChange}
-                                    placeholder="e.g. Frontend Engineer"
-                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
-                                />
-                            </div>
-                        </div>
-
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Type</label>
-                                <select
-                                    name="type"
-                                    value={formData.type}
-                                    onChange={handleChange}
-                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 focus:outline-none focus:border-amber-500 transition appearance-none"
-                                >
-                                    <option value="Intern">Intern</option>
-                                    <option value="Full-Time">Full-Time</option>
-                                    <option value="Remote">Remote</option>
-                                    <option value="Freelance">Freelance</option>
-                                    <option value="Intern + Offer">Intern + Offer</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Status</label>
-                                <select
-                                    name="status"
-                                    value={formData.status}
-                                    onChange={handleChange}
-                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 focus:outline-none focus:border-amber-500 transition appearance-none"
-                                >
-                                    <option value="Applied">Applied</option>
-                                    <option value="Resume Shortlisted">Resume Shortlisted</option>
-                                    <option value="OA Done">OA Done</option>
-                                    <option value="Interview Scheduled">Interview Scheduled</option>
-                                    <option value="Interview Done">Interview Done</option>
-                                    <option value="Rejected">Rejected</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Applied Date</label>
-                                <input
-                                    type="date"
-                                    name="appliedDate"
-                                    required
-                                    value={formData.appliedDate}
-                                    onChange={handleChange}
-                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 focus:outline-none focus:border-amber-500 transition"
-                                />
-                            </div>
-                        </div>
-
-                        
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Application Link</label>
-                            <input
-                                type="url"
-                                name="applicationLink"
-                                value={formData.applicationLink}
-                                onChange={handleChange}
-                                placeholder="https://workflow.com/..."
-                                className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
-                            />
-                        </div>
-
-                        
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Skills (comma separated)</label>
-                            <input
-                                type="text"
-                                name="skills"
-                                value={formData.skills}
-                                onChange={handleChange}
-                                placeholder="React, Node.js, MongoDB..."
-                                className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-amber-500 transition"
-                            />
-                        </div>
-
-                        
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">Notes</label>
-                            <textarea
-                                name="notes"
-                                rows="3"
-                                value={formData.notes}
-                                onChange={handleChange}
-                                placeholder="Any additional details..."
-                                className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-amber-500 transition resize-none"
-                            ></textarea>
-                        </div>
-
-                    </form>
-                </div>
-
-                
-                <div className="p-6 border-t border-gray-700 bg-[#0f172a] flex justify-end gap-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-6 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition font-medium"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        form="app-form"
-                        disabled={loading}
-                        className="px-6 py-2.5 rounded-lg bg-amber-500 text-black font-semibold hover:bg-amber-400 transition flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                        <span>{initialData ? "Update Application" : "Save Application"}</span>
-                    </button>
-                </div>
-
-            </div>
-        </div>
-    );
+      <QuickAddResumeModal
+        isOpen={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        existingResumes={resumes}
+        onSaved={handleQuickAddSaved}
+      />
+    </>
+  );
 }
 
 export default ApplicationForm;

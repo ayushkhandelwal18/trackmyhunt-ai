@@ -8,7 +8,6 @@ router.route("/").get(isAuthenticatedUser, getResumes);
 router.route("/:id")
     .delete(isAuthenticatedUser, deleteResume)
     .put(isAuthenticatedUser, updateResume);
-router.route("/").get(isAuthenticatedUser, getResumes);
 
 
 module.exports = router;

@@ -1,103 +1,113 @@
 import { Link, useLocation } from "react-router-dom";
 import {
-    Home,
-    LayoutDashboard,
-    Briefcase,
-    Lightbulb,
-    GraduationCap,
-    BookOpen,
-    NotebookPen,
-    FileText,
-    LogOut,
-    User as UserIcon,
-    X
+  LayoutDashboard,
+  Briefcase,
+  Lightbulb,
+  GraduationCap,
+  BookOpen,
+  NotebookPen,
+  FileText,
+  ScanSearch,
+  LogOut,
+  User as UserIcon,
+  X,
+  Crosshair,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 function Sidebar({ isOpen, onClose }) {
-    const location = useLocation();
-    const { logout } = useAuth();
+  const location = useLocation();
+  const { logout, user } = useAuth();
 
-    const menuItems = [
-        { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-        { name: "Applications", path: "/applications", icon: Briefcase },
-        { name: "Opportunities", path: "/opportunities", icon: Lightbulb },
-        { name: "Skillboard", path: "/skillboard", icon: GraduationCap },
-        { name: "Resources", path: "/resources", icon: BookOpen },
-        { name: "Resumes", path: "/resumes", icon: FileText },
-        { name: "Notes", path: "/notes", icon: NotebookPen },
-    ];
+  const workspace = [
+    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { name: "Applications", path: "/applications", icon: Briefcase },
+    { name: "Opportunities", path: "/opportunities", icon: Lightbulb },
+    { name: "Skillboard", path: "/skillboard", icon: GraduationCap },
+    { name: "Resources", path: "/resources", icon: BookOpen },
+    { name: "Resumes", path: "/resumes", icon: FileText },
+    { name: "AI Analyzer", path: "/ai-analyzer", icon: ScanSearch },
+    { name: "Notes", path: "/notes", icon: NotebookPen },
+  ];
 
-    return (
-        <aside
-            className={`fixed left-0 top-0 h-screen w-64 bg-[#0f172a] text-gray-300 border-r border-gray-700/50 flex flex-col z-50 transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-                }`}
-        >
-            {/* Logo & Close Button */}
-            <div className="p-6 border-b border-gray-700/50 flex justify-between items-center">
-                <Link to="/dashboard" className="text-2xl font-bold tracking-wide text-gray-100 flex items-center gap-2" onClick={onClose}>
-                    TrackMy<span className="text-amber-400">Hunt</span>
+  return (
+    <aside
+      className={`app-sidebar fixed left-0 top-0 z-50 flex h-screen w-[248px] flex-col transition-transform duration-200 ease-out ${
+        isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      }`}
+    >
+      <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
+        <Link to="/dashboard" className="flex items-center gap-2" onClick={onClose} aria-label="TrackMyHunt dashboard">
+          <span
+            style={{
+              display: "grid",
+              placeItems: "center",
+              height: 28,
+              width: 28,
+              borderRadius: 8,
+              background: "var(--brand)",
+              color: "#fff",
+            }}
+          >
+            <Crosshair size={16} />
+          </span>
+          <span style={{ fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-strong)", fontSize: "0.95rem" }}>
+            TrackMyHunt
+          </span>
+        </Link>
+        <button onClick={onClose} aria-label="Close navigation" className="app-icon-button app-sidebar-close md:hidden">
+          <X size={18} />
+        </button>
+      </div>
+
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
+        <div>
+          <div className="app-nav-section-label">Workspace</div>
+          <div className="space-y-1">
+            {workspace.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`app-nav-link ${isActive ? "active" : ""}`}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  <item.icon size={17} />
+                  <span>{item.name}</span>
                 </Link>
-                {/* Close Button (Mobile Only) */}
-                <button
-                    onClick={onClose}
-                    className="md:hidden text-gray-400 hover:text-white transition"
-                >
-                    <X size={24} />
-                </button>
-            </div>
+              );
+            })}
+          </div>
+        </div>
 
-            {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2 custom-scrollbar">
-                <div className="pt-2 pb-2">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-2">Menu</div>
-                    {menuItems.map((item) => {
-                        const isActive = location.pathname === item.path;
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                onClick={onClose} // Close sidebar on mobile when link is clicked
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-                                    ? "bg-amber-500/10 text-amber-400 font-semibold shadow-sm border border-amber-500/20"
-                                    : "text-gray-400 hover:bg-gray-800 hover:text-amber-400"
-                                    }`}
-                            >
-                                <item.icon size={20} />
-                                <span className="font-medium">{item.name}</span>
-                            </Link>
-                        );
-                    })}
-                </div>
+        <div>
+          <div className="app-nav-section-label">Account</div>
+          <Link
+            to="/profile"
+            onClick={onClose}
+            className={`app-nav-link ${location.pathname === "/profile" ? "active" : ""}`}
+          >
+            <UserIcon size={17} />
+            <span>Profile</span>
+          </Link>
+        </div>
+      </nav>
 
-                <div className="pt-2 pb-2">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 mb-2">Account</div>
-                    <Link
-                        to="/profile"
-                        onClick={onClose}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${location.pathname === "/profile"
-                            ? "bg-amber-500/10 text-amber-400 font-semibold shadow-sm border border-amber-500/20"
-                            : "text-gray-400 hover:bg-gray-800 hover:text-amber-400"
-                            }`}
-                    >
-                        <UserIcon size={20} />
-                        <span className="font-medium">Profile</span>
-                    </Link>
-                </div>
-            </nav>
-
-            {/* Logout */}
-            <div className="p-4 border-t border-gray-700/50">
-                <button
-                    className="flex items-center gap-3 w-full px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl transition-all duration-200"
-                    onClick={logout}
-                >
-                    <LogOut size={20} />
-                    <span className="font-medium">Logout</span>
-                </button>
-            </div>
-        </aside>
-    );
+      <div className="p-3" style={{ borderTop: "1px solid var(--border)" }}>
+        {user && (
+          <div className="mb-2 truncate px-2 text-xs" style={{ color: "var(--muted)" }}>
+            {user.email}
+          </div>
+        )}
+        <button type="button" className="app-nav-link w-full" onClick={logout} style={{ color: "var(--danger)" }}>
+          <LogOut size={17} />
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+  );
 }
 
 export default Sidebar;

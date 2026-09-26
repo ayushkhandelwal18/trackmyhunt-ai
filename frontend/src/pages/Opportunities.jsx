@@ -1,140 +1,148 @@
-import { useState, useEffect } from "react";
-import { Plus, Loader2, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { getOpportunities, createOpportunity, updateOpportunity, deleteOpportunity } from "../services/api";
 import OpportunityCard from "../components/opportunities/OpportunityCard";
 import OpportunityForm from "../components/opportunities/OpportunityForm";
+import AppButton from "../components/ui/AppButton";
+import PageHeader from "../components/ui/PageHeader";
+import SearchInput from "../components/ui/SearchInput";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingState from "../components/ui/LoadingState";
+import ErrorState from "../components/ui/ErrorState";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 function Opportunities() {
   const [opportunities, setOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOpp, setEditingOpp] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Search
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("All");
 
-  const fetchOpportunities = async () => {
+  async function fetchOpportunities() {
     try {
       setLoading(true);
+      setError("");
       const data = await getOpportunities();
-      setOpportunities(data);
+      setOpportunities(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Unable to load opportunities.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
     fetchOpportunities();
   }, []);
 
-  const handleAddClick = () => {
-    setEditingOpp(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (opp) => {
-    setEditingOpp(opp);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this opportunity?")) return;
-    try {
-      await deleteOpportunity(id);
-      setOpportunities(opportunities.filter(op => op._id !== id));
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleFormSubmit = async (formData) => {
+  async function handleFormSubmit(formData) {
     try {
       setSubmitLoading(true);
+      setFormError("");
       if (editingOpp) {
         const updated = await updateOpportunity(editingOpp._id, formData);
-        setOpportunities(opportunities.map(op => op._id === updated._id ? updated : op));
+        setOpportunities((prev) => prev.map((op) => (op._id === updated._id ? updated : op)));
       } else {
-        const newOpp = await createOpportunity(formData);
-        setOpportunities([newOpp, ...opportunities]);
+        const created = await createOpportunity(formData);
+        setOpportunities((prev) => [created, ...prev]);
       }
       setIsModalOpen(false);
+      setEditingOpp(null);
     } catch (err) {
-      alert(err.message);
+      setFormError(err.message || "Unable to save opportunity.");
     } finally {
       setSubmitLoading(false);
     }
-  };
+  }
 
-  const filteredOpps = opportunities.filter(op =>
-    op.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    op.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return;
+    try {
+      setDeleteLoading(true);
+      await deleteOpportunity(deleteTarget._id);
+      setOpportunities((prev) => prev.filter((op) => op._id !== deleteTarget._id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err.message || "Unable to delete opportunity.");
+      setDeleteTarget(null);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  const filteredOpps = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return opportunities.filter((op) => {
+      const matchesQuery =
+        !query ||
+        (op.company || "").toLowerCase().includes(query) ||
+        (op.role || "").toLowerCase().includes(query);
+      const matchesType = typeFilter === "All" || op.type === typeFilter;
+      return matchesQuery && matchesType;
+    });
+  }, [opportunities, searchQuery, typeFilter]);
 
   return (
-    <div className="space-y-8">
+    <div className="app-page">
+      <PageHeader
+        eyebrow="Planner"
+        title="Opportunities"
+        description="Roles you plan to pursue. Move them to Applications once you've applied."
+        action={
+          <AppButton onClick={() => { setEditingOpp(null); setFormError(""); setIsModalOpen(true); }}>
+            <Plus size={16} /> Add opportunity
+          </AppButton>
+        }
+      />
 
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">My Opportunities</h1>
-          <p className="text-gray-400">Keep track of future job openings and referrals.</p>
+      <div className="app-toolbar">
+        <div style={{ flex: "1 1 220px", maxWidth: 360 }}>
+          <SearchInput placeholder="Search company or role…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
-        <button
-          onClick={handleAddClick}
-          className="bg-amber-500 text-black px-5 py-2.5 rounded-xl font-semibold hover:bg-amber-400 transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
-        >
-          <Plus size={20} /> Add Opportunity
-        </button>
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="app-select-inline" aria-label="Filter by type">
+          {["All", "Intern", "Full-Time", "Remote", "Freelance", "Intern + Offer", "Other"].map((t) => (
+            <option key={t} value={t}>{t === "All" ? "All types" : t}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Search */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-          <input
-            type="text"
-            placeholder="Search company or role..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#1e293b] text-gray-100 pl-10 pr-4 py-3 rounded-xl border border-gray-700/50 focus:outline-none focus:border-amber-500 transition"
-          />
-        </div>
-      </div>
+      {formError && <ErrorState message={formError} />}
 
-      {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-amber-500" size={40} />
-        </div>
+        <LoadingState rows={4} />
       ) : error ? (
-        <div className="text-red-400 bg-red-500/10 p-4 rounded-xl border border-red-500/20">
-          Error: {error}
-        </div>
+        <ErrorState message="Unable to load opportunities right now. Please try again shortly." onRetry={fetchOpportunities} />
       ) : filteredOpps.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-          <p className="text-gray-500 text-lg mb-4">No opportunities found.</p>
-          <button onClick={handleAddClick} className="text-amber-500 font-medium hover:underline">Add your first opportunity</button>
-        </div>
+        <EmptyState
+          title={searchQuery || typeFilter !== "All" ? "No opportunities match" : "No opportunities yet"}
+          description="Save roles you want to apply to, with deadlines and links."
+          action={
+            <AppButton onClick={() => { setEditingOpp(null); setIsModalOpen(true); }}>
+              <Plus size={15} /> Add opportunity
+            </AppButton>
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredOpps.map(op => (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredOpps.map((op) => (
             <OpportunityCard
               key={op._id}
               item={op}
-              onEdit={handleEditClick}
-              onDelete={handleDelete}
+              onEdit={(item) => { setEditingOpp(item); setFormError(""); setIsModalOpen(true); }}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
       )}
 
-      {/* Modal */}
       <OpportunityForm
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -143,6 +151,14 @@ function Opportunities() {
         loading={submitLoading}
       />
 
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete opportunity?"
+        description={`Remove ${deleteTarget?.company || "this opportunity"}? This cannot be undone.`}
+        loading={deleteLoading}
+      />
     </div>
   );
 }
