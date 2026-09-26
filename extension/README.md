@@ -99,8 +99,8 @@ flowchart TD
     subgraph Normalization["Normalization & Guards"]
         Clean[cleanCompany & cleanRole]
         LocNorm[normalizeLocation]
-        TypeNorm[normalizeEmploymentType: Intern | Full-Time | Remote | Freelance | Other]
-        ModeNorm[normalizeWorkMode: Remote | Hybrid | On-site]
+        TypeNorm["normalizeEmploymentType (Intern, Full-Time, Remote, Freelance, Other)"]
+        ModeNorm["normalizeWorkMode (Remote, Hybrid, On-site)"]
         UrlNorm[canonicalJobUrl: Drop tracking query parameters]
         Guard{looksLikeListingPage?}
     end

@@ -6,654 +6,137 @@ TrackMyHunt is an end-to-end job search management and application tracking plat
 
 ## 1. Product Overview
 
-### Problem Statement
-During an active job hunt, candidates track dozens or hundreds of positions across disparate channels (job boards, company career portals, referrals, and campus drives). This leads to:
-- Disorganized spreadsheets with missing metadata, broken links, and outdated statuses.
-- Missed follow-ups and uncoordinated interview preparation.
+### The Problem It Solves
+Job hunting across multiple job boards, portals, and applicant tracking systems often leads to:
+- Disorganized spreadsheets with missing links, outdated statuses, and forgotten follow-ups.
 - Submitting generic resumes that fail to address explicit job description requirements.
-- Redundant manual data entry when transitioning between job boards and tracking sheets.
+- Redundant manual data entry whenever a new job posting is discovered.
 
-### Target Audience
-- Students and new graduates seeking internships and entry-level positions.
-- Software engineers and technology professionals managing multi-stage technical interview loops.
-- Career changers and active job seekers who require structured organization for high-volume outreach.
+### Who It Is For
+- **Students & Fresh Graduates**: Preparing for campus drives, internships, and entry-level positions.
+- **Software Engineers & Tech Professionals**: Managing multi-stage interview loops across multiple companies.
+- **Active Job Seekers**: Requiring structured tracking for high-volume outreach and timely follow-ups.
 
 ### System Solution
-TrackMyHunt addresses these friction points through two tightly coupled components:
-1. **TrackMyHunt Web Application**: A centralized productivity dashboard providing CRUD operations for job applications, visual Kanban pipeline management, interview timeline history, proactive opportunity scheduling, skill tracking, curated resources, markdown-capable notes, link-based resume organization, and an automated background reminder subsystem. It also hosts the AI Resume & JD Analyzer.
-2. **TrackMyHunt Browser Extension**: A Manifest V3 companion side panel that parses active job portal web pages in real time via a layered extraction engine, extracts structured role metadata, flags duplicate applications against the backend, and syncs directly into the user's dashboard.
+- **TrackMyHunt Web Application**: A full-featured workspace offering CRUD tracking for job applications, Kanban board organization, interview timeline snapshots, future opportunity scheduling, self-assessed skill boards, interview notes, link-based resume cataloging, and an in-memory AI Resume & JD Analyzer.
+- **TrackMyHunt Browser Extension**: A Chrome Manifest V3 companion side panel that parses job postings on active browser tabs (LinkedIn, Indeed, Naukri, Internshala, ATS boards, etc.), checks for duplicates, and saves them directly into your dashboard.
 
 ---
 
-## 2. Features
+## 2. Local Development & Installation
 
-### Authentication and Account Security
-- **Email & Password Authentication**: Registration secured with bcrypt password hashing and mandatory 6-digit OTP verification delivered via email.
-- **OTP Verification & Resend**: Time-limited verification codes (10-minute expiry) for account verification and password resets.
-- **Google OAuth 2.0**: Direct sign-in using Google identity tokens verified server-side with `google-auth-library`.
-- **JWT Session Management**: Signed JSON Web Tokens (30-day validity) transmitted via `Authorization: Bearer` headers across protected REST endpoints.
-- **Account Management**: Self-service profile updates, password changes, and complete account deletion with cascading cleanups.
-
-### Centralized Dashboard
-- **Aggregate Metrics**: Real-time counter metrics tracking Total Applications, Active/Pending Applications, Interviews (Scheduled & Completed), and Rejections.
-- **Recent Pipeline Activity**: Direct feed of the 5 most recently updated applications with current stage indicators.
-- **Upcoming Opportunities**: Priority listing of upcoming hiring cycles mapped from the Opportunity Planner.
-- **Skill Proficiency Distribution**: Dynamic breakdown of tracked skills grouped by proficiency level (Beginner, Intermediate, Advanced, Expert).
-
-### Application Tracking & Pipeline Management
-- **Full Application Lifecycle Tracking**: Records company name, job role, employment type (`Intern`, `Full-Time`, `Remote`, `Freelance`, `Intern + Offer`, `Other`), skills required, application link, notes, and application date.
-- **Status Management**: Supports seven workflow statuses: `Applied`, `Resume Shortlisted`, `OA Done`, `Interview Scheduled`, `Interview Done`, `Rejected`, and `Other`.
-- **Kanban Board**: Drag-and-drop board for visual stage transitions with status-specific metadata prompts.
-- **Application Detail View & Timeline**: Dedicated route (`/applications/:id`) displaying application metadata, mapped resume links, and an immutable event timeline tracking each status transition snapshot.
-- **Status Details Capture**: Context-sensitive fields for specific stages:
-  - *Interview*: Date, time, interview type (`Technical`, `HR`, `Behavioral`, `Managerial`, `Other`), meeting link, and preparation notes.
-  - *Online Assessment (OA)*: Completion/due date, assessment portal link, and notes.
-  - *Rejection*: Rejection date and optional feedback/reason.
-- **Duplicate Application Prevention**: Backend checks compare incoming submissions against existing applications using normalized job URLs or normalized company and role combinations to prevent redundant records.
-
-### Opportunity Planner
-- **Forward-Looking Pipeline**: Track prospective openings and upcoming company hiring windows before formal applications open.
-- **Timeline Organization**: Filter and sort planned opportunities by opening month, opening year, target role, and employment type.
-
-### Skillboard
-- **Competency Inventory**: Self-assessed skills directory categorized by functional domain (e.g., Frontend, Backend, Database, Core CS, Soft Skills).
-- **Proficiency Levels**: Structured categorization across `Beginner`, `Intermediate`, `Advanced`, and `Expert`.
-- **Target Role Alignment**: Explicit mapping of individual skills to target job titles.
-
-### Resources Hub
-- **Curated Knowledge Repository**: Organize preparation materials, articles, interview cheat sheets, repositories, and documentation.
-- **Multi-Category Tagging**: Classify resources by type (`GitHub`, `YouTube`, `Blog`, `Article`, `Course`, `Website`, `Documentation`, `LinkedIn`, `Google Drive`, `Google Sheets`, `PDF`, `Other`).
-
-### Notes & Brain Dump
-- **Interview & Preparation Notes**: Timestamped markdown-ready scratchpad for recording technical question breakdowns, interview retrospectives, recruiter correspondence, and daily agendas.
-- **Tagging & Filtering**: Searchable multi-tag categorization for fast retrieval.
-
-### Resume Manager
-- **Link-Based Version Catalog**: Organize resume variations tailored to specific niches (e.g., Full-Stack, Backend, Systems, Internship) using external links (Google Drive, Dropbox, Notion, personal portfolio).
-- **Application Association**: Associate specific resume versions with individual job applications without storing binary files in the database.
-
-### AI Resume & JD Analyzer
-- **Direct PDF Parsing**: Memory-only PDF upload (up to 5 MB) validated against magic bytes (`%PDF-`) and extracted using `pdf-parse` without persisting raw files to disk or database.
-- **LLM Evidence Extraction**: Leverages Groq API running `openai/gpt-oss-120b` at `temperature: 0` to extract explicit factual evidence from the resume against JD requirements.
-- **Deterministic Scoring Engine**: Category scores, overall match score (0-100), and fit levels (`Strong Fit`, `Moderate Fit`, `Low Fit`, `Not a Fit`) are calculated deterministically on the backend from extracted evidence, ensuring consistent and explainable results.
-- **Actionable Feedback**: Generates matched skills (up to 10), critical missing must-have requirements (up to 5), good-to-have improvement recommendations (up to 8), an executive summary, and an actionable final recommendation.
-- **SHA-256 Caching**: Analyses are hashed and cached per user, resume text content, normalized job description, and prompt version to eliminate redundant API calls.
-
-### Automated Email Reminders
-- **Proactive Notifications**: Scheduled background engine running through external cron triggers (`npm run reminders`).
-- **Follow-up Digests**: Automated emails alerting candidates to applications lingering in `Applied` status beyond a configured day threshold (default: 7 days, minimum pending batch size: 3).
-- **Interview Alerts**: Automated reminders dispatched 24 hours prior to scheduled interview timestamps.
-- **Idempotent Batch Protocol**: Reminders use atomic batch claiming (`batchId`) and unique compound index fingerprints (`date|time|type|link`) to guarantee zero duplicate emails across overlapping scheduler runs.
-- **Template Delivery**: Branded, responsive HTML templates delivered via Resend API.
-- **User Configurable**: Opt-in toggles and thresholds managed via user profile settings.
-
-### Companion Browser Extension
-- **Chrome Manifest V3**: Side-panel extension running on Chrome 116+ that detects job postings on the active browser tab.
-- **Layered Multi-Tier Scraping**: Cascading pipeline combining platform scrapers, JSON-LD structured data, OpenGraph metadata, and DOM heuristics.
-- **Supported Job Platforms**: Specialized scrapers for LinkedIn, Indeed, Naukri, Internshala, Greenhouse, Lever, Workday, Ashby, Google Forms, and generic career pages.
-- **Silent Token Synchronization**: Secure background JWT synchronization with the active TrackMyHunt web app session via local content scripts.
-
----
-
-## 3. Product Workflow
-
-```mermaid
-flowchart TD
-    A([Discover Opportunity]) --> B{Discovery Method}
-    B -->|Browsing Job Portal| C[Open TrackMyHunt Side Panel]
-    B -->|Direct / Referral| D[Open TrackMyHunt Web App]
-    
-    C --> E[Extension Pipeline Extracts Job Data]
-    E --> F[Review / Edit Metadata in Side Panel]
-    F --> G[Submit via Extension]
-    
-    D --> H[Manually Enter Application Form]
-    H --> I[Submit via Dashboard]
-    
-    G --> J{Backend Duplicate Check}
-    I --> J
-    
-    J -->|Duplicate Found| K[Reject / Display Existing Record]
-    J -->|Unique Record| L[(Save to MongoDB & Record Event)]
-    
-    L --> M[Track on Applications Table / Kanban Board]
-    
-    M --> N{Preparation Phase}
-    N --> O[Run AI Resume & JD Analyzer]
-    O --> P[Review Match Score & Fill Skill Gaps]
-    N --> Q[Consult Resources Hub & Notes]
-    
-    P --> R[Attend Interview / Complete OA]
-    R --> S[Update Status & Record StatusDetails]
-    S --> T[(Log Immutable ApplicationEvent Snapshot)]
-    
-    T --> U[Background Scheduler Cycle]
-    U --> V{Check Reminder Criteria}
-    V -->|Stale 'Applied' > Threshold| W[Send Follow-Up Digest Email]
-    V -->|Upcoming Interview in 24h| X[Send Interview Alert Email]
-    V -->|Conditions Not Met| Y[Idle / Wait for Next Run]
-```
-
-### Typical Usage Cycle
-1. **Discovery & Capture**: The candidate discovers an opening on LinkedIn, Indeed, or an ATS board. Opening the TrackMyHunt extension side panel automatically extracts the company, role title, job location, work mode, employment type, and posting URL.
-2. **Review & Ingestion**: The candidate confirms or edits details in the extension side panel and submits. The backend verifies that the normalized URL or company/role combination does not already exist for that user.
-3. **Targeted Preparation**: The candidate visits `/ai-analyzer`, uploads their target resume PDF, and pastes the job description. The analyzer provides an objective match score, pinpoints missing requirements, and provides actionable adjustment tips.
-4. **Active Pipeline Tracking**: As the candidate progresses, they drag cards across the Kanban board or update status through the table view. When changing status to `Interview Scheduled`, `OA Done`, or `Rejected`, detailed modal inputs capture interview links, dates, times, and assessment notes.
-5. **Timeline Auditing**: Each status modification writes a snapshot event to `ApplicationEvent`, allowing the candidate to review the complete progression history on the application detail page.
-6. **Automated Follow-up Assistance**: If an application remains without response past the user's configured threshold, or when an interview is 24 hours away, the scheduled reminder daemon dispatches notification emails via Resend.
-
----
-
-## 4. High-Level Architecture
-
-```mermaid
-flowchart TB
-    subgraph Clients["Client Layer"]
-        WebApp["TrackMyHunt Web App\n(React 19 + Vite + Tailwind CSS 4)"]
-        Extension["TrackMyHunt Chrome Extension\n(MV3 Side Panel + Content Scripts)"]
-    end
-
-    subgraph Network["Security & Ingress Layer"]
-        CORS["CORS Middleware\n(Origin Filtering & Extension Protocols)"]
-        AuthMid["JWT Auth Middleware\n(Bearer Token Verification)"]
-    end
-
-    subgraph Server["Backend Application Layer (Node.js + Express 5)"]
-        subgraph Controllers["API Controllers"]
-            AuthCtrl["Auth Controller"]
-            UserCtrl["User Controller"]
-            AppCtrl["Application Controller"]
-            AICtrl["AI Controller"]
-            DashCtrl["Dashboard Controller"]
-            MiscCtrl["Opportunity / Skill / Resource / Note / Resume Controllers"]
-        end
-
-        subgraph Services["Core Business Services"]
-            AuthSvc["Auth Service\n(bcrypt + OTP)"]
-            AppSvc["Application Service\n(Duplicate Engine & Event Scribe)"]
-            AISvc["AI Service\n(Groq SDK + Deterministic Scoring)"]
-            ExtractSvc["PDF Extract Service\n(pdf-parse + Normalizer)"]
-            ReminderSvc["Reminder Service\n(Atomic Batch Claiming)"]
-            MailSvc["Mail Service\n(Template Engine + Resend API)"]
-        end
-    end
-
-    subgraph Workers["Background Tasks & Crons"]
-        CronScript["Reminder Script Runner\n(scripts/send-reminders.js)"]
-    end
-
-    subgraph External["External Services & APIs"]
-        GroqAPI["Groq Cloud LLM\n(openai/gpt-oss-120b)"]
-        ResendAPI["Resend Email API"]
-        GoogleAuth["Google OAuth 2.0 API"]
-    end
-
-    subgraph Persistence["Database Layer (MongoDB via Mongoose 9)"]
-        M_User[(Users)]
-        M_App[(Applications)]
-        M_Event[(ApplicationEvents)]
-        M_Reminder[(Reminders)]
-        M_Opp[(Opportunities)]
-        M_Skill[(Skills)]
-        M_Res[(Resources)]
-        M_Note[(Notes)]
-        M_Resume[(Resumes)]
-    end
-
-    WebApp -->|HTTPS / REST| CORS
-    Extension -->|chrome-extension:// Ingress| CORS
-    Extension -.->|Extracts DOM & Syncs JWT| WebApp
-
-    CORS --> AuthMid
-    AuthMid --> Controllers
-
-    AuthCtrl --> AuthSvc
-    AuthCtrl --> GoogleAuth
-    UserCtrl --> AuthSvc
-    AppCtrl --> AppSvc
-    AICtrl --> ExtractSvc
-    AICtrl --> AISvc
-    DashCtrl --> AppSvc
-    MiscCtrl --> Persistence
-
-    AISvc -->|Evidence Extraction Prompt| GroqAPI
-    AuthSvc --> MailSvc
-    ReminderSvc --> MailSvc
-    MailSvc -->|Delivers Templated Email| ResendAPI
-
-    CronScript --> ReminderSvc
-
-    AuthSvc --> M_User
-    AppSvc --> M_App
-    AppSvc --> M_Event
-    ReminderSvc --> M_Reminder
-    ReminderSvc --> M_App
-    ReminderSvc --> M_User
-```
-
----
-
-## 5. Technology Stack
-
-### Frontend Application
-| Layer / Component | Technology | Version | Description |
-|---|---|---|---|
-| Core Framework | React | `^19.1.1` | Modern React architecture with functional components and hooks |
-| Bundler & Tooling | Vite | `^7.1.7` | High-speed frontend development server and rollup packager |
-| Styling & Theme | Tailwind CSS | `^4.1.16` | Utility-first CSS engine with dark/light mode context support |
-| Application Routing | React Router DOM | `^7.9.5` | Client-side declarative routing and protected route wrappers |
-| Iconography | Lucide React | `^0.552.0` | Comprehensive UI SVG icons |
-| OAuth Integration | `@react-oauth/google` | `^0.13.4` | Google Identity Services integration for browser sign-in |
-| Code Quality | ESLint | `^9.36.0` | Modern flat-config linting suite |
-
-### Backend API Server
-| Layer / Component | Technology | Version | Description |
-|---|---|---|---|
-| Runtime Environment | Node.js | `>= 18.0.0` | Server-side JavaScript execution environment |
-| Web Application Framework | Express | `^5.2.1` | Next-generation Express web framework |
-| Object-Document Mapper | Mongoose | `^9.1.5` | Strict schema modeling and validation for MongoDB |
-| Password Security | bcrypt | `^6.0.0` | Cryptographic hashing for user password credentials |
-| Token Management | jsonwebtoken | `^9.0.3` | HMAC-SHA256 stateless session tokens |
-| OAuth Verification | google-auth-library | `^10.5.0` | Server-side cryptographic verification of Google ID tokens |
-| AI Integration | groq-sdk | `^1.6.0` | Client for Groq high-speed LLM inference endpoint |
-| Email Delivery | resend | `^6.28.1` | Developer-first transactional email delivery API |
-| File Handling | multer | `^2.4.0` | Memory storage upload middleware for resume PDF payloads |
-| PDF Text Extraction | pdf-parse | `^2.4.5` | Buffer-based binary text extractor for uploaded PDF resumes |
-| Input Validation | validator | `^13.15.35` | String sanitization and RFC-compliant email verification |
-| Cookie Parsing | cookie-parser | `^1.4.7` | HTTP request cookie parsing utility |
-
-### Browser Extension
-| Layer / Component | Technology | Version | Description |
-|---|---|---|---|
-| Extension Specification | Chrome Manifest V3 | MV3 | Chrome extension standard using Background Service Workers |
-| User Interface | React + Vite | `^19.2.7` / `^8.1.1` | Side panel SPA UI using modern React |
-| Extension Plugin | `@crxjs/vite-plugin` | `^2.0.0` | Vite plugin for Chrome Manifest V3 integration |
-| Styling | Tailwind CSS | `^3.4.19` | Extension side panel styling engine |
-| Static Analysis | oxlint | `^1.71.0` | High-performance Rust-based JavaScript linter |
-
----
-
-## 6. Database Models & Schema Design
-
-All application entities are modeled using Mongoose schemas on MongoDB:
-
-```mermaid
-erDiagram
-    USER ||--o{ APPLICATION : owns
-    USER ||--o{ APPLICATION_EVENT : logs
-    USER ||--o{ REMINDER : receives
-    USER ||--o{ OPPORTUNITY : plans
-    USER ||--o{ SKILL : assesses
-    USER ||--o{ RESOURCE : curates
-    USER ||--o{ NOTE : writes
-    USER ||--o{ RESUME : catalogs
-    APPLICATION ||--o{ APPLICATION_EVENT : tracks_history
-    APPLICATION ||--o{ REMINDER : triggers
-    APPLICATION }o--|| RESUME : references
-
-    USER {
-        ObjectId _id PK
-        string name
-        string email UK
-        string password
-        string googleId UK
-        string avatar
-        boolean isVerified
-        string otp
-        date otpExpires
-        object reminderSettings
-        date createdAt
-        date updatedAt
-    }
-
-    APPLICATION {
-        ObjectId _id PK
-        ObjectId user FK
-        string company
-        string role
-        string type "Intern|Full-Time|Remote|Freelance|Intern + Offer|Other"
-        string skills
-        string status "Applied|Resume Shortlisted|OA Done|Interview Scheduled|Interview Done|Rejected|Other"
-        string applicationLink
-        string notes
-        date appliedDate
-        ObjectId resumeId FK
-        object statusDetails "interview | oa | rejection"
-        date createdAt
-        date updatedAt
-    }
-
-    APPLICATION_EVENT {
-        ObjectId _id PK
-        ObjectId user FK
-        ObjectId application FK
-        string type "created|status_changed"
-        string fromStatus
-        string toStatus
-        object snapshot "status|resumeTitle|interview|oa|rejection"
-        date createdAt
-    }
-
-    REMINDER {
-        ObjectId _id PK
-        ObjectId user FK
-        ObjectId application FK
-        string type "followup|interview"
-        string fingerprint "Unique slot fingerprint"
-        date remindAt
-        string status "pending|claimed|sent|cancelled"
-        ObjectId batchId
-        date sentAt
-        date createdAt
-    }
-
-    OPPORTUNITY {
-        ObjectId _id PK
-        ObjectId user FK
-        string company
-        string role
-        string type
-        string openingMonth
-        number openingYear
-        string skills
-        string link
-        string notes
-        date createdAt
-    }
-
-    SKILL {
-        ObjectId _id PK
-        ObjectId user FK
-        string name
-        string category
-        string proficiency "Beginner|Intermediate|Advanced|Expert"
-        string target
-        date createdAt
-    }
-
-    RESOURCE {
-        ObjectId _id PK
-        ObjectId user FK
-        string title
-        string type "GitHub|YouTube|Blog|Article|Course|Website|Documentation|LinkedIn|Google Drive|Google Sheets|PDF|Other"
-        string link
-        string description
-        date createdAt
-    }
-
-    NOTE {
-        ObjectId _id PK
-        ObjectId user FK
-        string title
-        string content
-        string tags
-        date date
-        date createdAt
-    }
-
-    RESUME {
-        ObjectId _id PK
-        ObjectId user FK
-        string title
-        string link
-        string description
-        date createdAt
-    }
-```
-
----
-
-## 7. AI Resume & JD Analyzer Pipeline
-
-The AI Resume & JD Analyzer operates through an isolated, deterministic pipeline:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant Browser as Web Client (/ai-analyzer)
-    participant Server as Express Server (/api/ai/analyze)
-    participant Multer as Multer Memory Storage
-    participant Extractor as Text Extractor (pdf-parse)
-    participant AISvc as AI Service (Groq)
-    participant Groq as Groq LLM (openai/gpt-oss-120b)
-
-    User->>Browser: Uploads PDF Resume + Pastes Job Description
-    Browser->>Server: POST /api/ai/analyze (multipart/form-data)
-    Server->>Multer: Buffer in RAM (Strict 5 MB limit, PDF mime check)
-    Multer-->>Server: File Buffer
-    Server->>Extractor: Validate Magic Bytes (%PDF-) & Extract Raw Text
-    Extractor-->>Server: Extracted UTF-8 Resume String
-    Server->>AISvc: normalizeResumeText() [Unicode NFKC, strip BOM & control chars]
-    
-    rect rgb(240, 248, 255)
-        Note over Server,AISvc: Generate SHA-256 Cache Key:<br/>(provider + model + prompt_ver + userId + resumeHash + jdHash)
-    end
-
-    alt Cache Hit
-        AISvc-->>Server: Return Stored Analysis Report
-    else Cache Miss
-        AISvc->>Groq: Chat Completion (temperature: 0, response_format: json_object)
-        Note over Groq: Extracts structured requirements[] &<br/>classifies candidate evidence (direct/partial/none)
-        Groq-->>AISvc: Raw JSON with Requirement Classifications
-        AISvc->>AISvc: validateAnalysis() & applyActivityGuard()
-        AISvc->>AISvc: computeBreakdown() & computeOverallScore() deterministically
-        AISvc->>AISvc: Cache Result in Memory (7-Day TTL)
-        AISvc-->>Server: Final Normalized Analysis Payload
-    end
-
-    Server-->>Browser: 200 OK { success: true, cached: boolean, analysis: {...} }
-    Browser->>User: Renders Score, Fit Badge, Breakdown, Skills & Tips
-```
-
-### Deterministic Scoring Guarantees
-- **No LLM Score Hallucination**: The LLM is strictly instructed *never* to generate an overall numerical score. It acts exclusively as an evidence mapper, extracting material requirements and classifying them as `direct`, `partial`, or `none`.
-- **Backend Math**: The overall score (0–100) is derived from category weights (Skills Technical Match, Role Relevance, Experience, Education, and Domain Alignment).
-- **Activity Guard**: Routine daily activities (e.g., "attending team standups") are guarded to prevent penalizing candidates if unmentioned in the resume.
-- **Privacy & Memory Lifecycle**: Uploaded PDF files are never written to disk, never uploaded to S3/Cloudinary, and never retained in the database. Once the request finishes, the file buffer is discarded by the garbage collector.
-
----
-
-## 8. Email Reminders & Background Subsystem
-
-TrackMyHunt features an opt-in reminder subsystem that tracks stale applications and upcoming interviews.
-
-```mermaid
-flowchart TD
-    Start([Cron Trigger: npm run reminders]) --> ConnectDB[(Connect to MongoDB)]
-    ConnectDB --> RunCycle[runReminderCycle]
-    
-    subgraph FollowupFlow["1. Follow-up Digest Cycle"]
-        FindUsers1[Find Users with followupReminders Enabled] --> CheckApps[Find 'Applied' status applications older than threshold]
-        CheckApps --> CheckEligible{Eligible count >= minPendingApplications?}
-        CheckEligible -->|No| SkipFollowup[Skip User]
-        CheckEligible -->|Yes| ClaimFollowup[Atomic Upsert 'pending' Reminder Markers]
-        ClaimFollowup --> AtomicBatch1[Claim Markers with Run batchId]
-        AtomicBatch1 --> RenderFollowup[Render followup-email.html]
-        RenderFollowup --> SendFollowup[Deliver via Resend API]
-        SendFollowup --> MarkSent1[Update Marker status: 'sent', sentAt: now]
-    end
-
-    subgraph InterviewFlow["2. Interview Reminder Cycle"]
-        FindUsers2[Find Users with interviewReminders Enabled] --> CheckInterviews[Find 'Interview Scheduled' applications]
-        CheckInterviews --> CalcDue{Due Window: Now <= InterviewTime <= Now + Hours?}
-        CalcDue -->|No| SkipInterview[Skip Application]
-        CalcDue -->|Yes| GenFingerprint[Generate Slot Fingerprint: date|time|type|link]
-        GenFingerprint --> ClaimInterview[Atomic Upsert 'pending' Marker]
-        ClaimInterview --> AtomicBatch2[Claim Markers with Run batchId]
-        AtomicBatch2 --> RenderInterview[Render interview-email.html]
-        RenderInterview --> SendInterview[Deliver via Resend API]
-        SendInterview --> MarkSent2[Update Marker status: 'sent', sentAt: now]
-    end
-
-    RunCycle --> FollowupFlow
-    RunCycle --> InterviewFlow
-    MarkSent1 --> Complete([Exit Process with Code 0])
-    MarkSent2 --> Complete
-```
-
-### Reliability & Idempotency
-- **Fingerprinted Slots**: Rescheduling an interview produces a new hash (`date|time|type|link`), invalidating stale markers and preventing missed alerts for updated slots.
-- **Atomic Two-Phase Claims**: Reminders are first created in a `pending` state with unique compound constraints (`user + application + type + fingerprint`), then claimed using an atomic `batchId`. Only records owned by the active batch are emailed, completely eliminating race conditions.
-
----
-
-## 9. REST API Specification
-
-All protected endpoints require an `Authorization: Bearer <JWT>` header.
-
-### Authentication Endpoints (`/api/auth`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/signup` | Public | Register new user; dispatches verification OTP |
-| `POST` | `/api/auth/verify-otp` | Public | Verify registration OTP; issues JWT token |
-| `POST` | `/api/auth/resend-otp` | Public | Resend time-limited verification OTP email |
-| `POST` | `/api/auth/login` | Public | Authenticate via email & password; issues JWT |
-| `POST` | `/api/auth/google` | Public | Verify Google OAuth identity token; issues JWT |
-| `POST` | `/api/auth/forgot-password` | Public | Request password reset OTP email |
-| `POST` | `/api/auth/reset-password` | Public | Submit reset OTP and set new password |
-
-### User Management (`/api/user`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `PUT` | `/api/user/profile` | Bearer | Update user display name and profile fields |
-| `PUT` | `/api/user/password` | Bearer | Change account password (requires old password) |
-| `DELETE` | `/api/user/account` | Bearer | Permanently delete account and all cascading data |
-| `GET` | `/api/user/reminders` | Bearer | Fetch user reminder configuration & thresholds |
-| `PUT` | `/api/user/reminders` | Bearer | Update reminder preferences & delivery limits |
-
-### Job Applications (`/api/applications`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/applications` | Bearer | Fetch all applications for user, sorted by date |
-| `POST` | `/api/applications` | Bearer | Create application with duplicate protection |
-| `PUT` | `/api/applications/:id` | Bearer | Update application fields or status details |
-| `DELETE` | `/api/applications/:id` | Bearer | Delete application and clean up reminders/events |
-| `GET` | `/api/applications/:id/events` | Bearer | Retrieve immutable status history timeline events |
-
-### Opportunity Planner (`/api/opportunities`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/opportunities` | Bearer | Fetch planned upcoming opportunities |
-| `POST` | `/api/opportunities` | Bearer | Create new future opening record |
-| `PUT` | `/api/opportunities/:id` | Bearer | Update planned opportunity fields |
-| `DELETE` | `/api/opportunities/:id` | Bearer | Delete planned opportunity record |
-
-### Skillboard (`/api/skills`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/skills` | Bearer | Fetch all self-assessed skills |
-| `POST` | `/api/skills` | Bearer | Add a skill with proficiency rating and target |
-| `PUT` | `/api/skills/:id` | Bearer | Modify skill rating or target role |
-| `DELETE` | `/api/skills/:id` | Bearer | Delete skill record |
-
-### Resources Hub (`/api/resources`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/resources` | Bearer | Fetch saved reference links and study materials |
-| `POST` | `/api/resources` | Bearer | Add resource with category type and link |
-| `PUT` | `/api/resources/:id` | Bearer | Update resource metadata |
-| `DELETE` | `/api/resources/:id` | Bearer | Delete resource entry |
-
-### Notes (`/api/notes`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/notes` | Bearer | Retrieve preparation notes and brain dump entries |
-| `POST` | `/api/notes` | Bearer | Create timestamped note with tags |
-| `PUT` | `/api/notes/:id` | Bearer | Edit note title, content, or tags |
-| `DELETE` | `/api/notes/:id` | Bearer | Delete note entry |
-
-### Resume Manager (`/api/resumes`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/resumes` | Bearer | List saved resume links and descriptions |
-| `POST` | `/api/resumes` | Bearer | Add external resume link (e.g. Google Drive) |
-| `PUT` | `/api/resumes/:id` | Bearer | Update resume title, link, or description |
-| `DELETE` | `/api/resumes/:id` | Bearer | Delete resume reference |
-
-### Dashboard Aggregations (`/api/dashboard`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/api/dashboard` | Bearer | Aggregated counts, recent 5 apps, upcoming roles |
-
-### AI Analysis (`/api/ai`)
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/ai/analyze` | Bearer | Multipart upload (`resumePdf` + `jobDescription`) |
-
----
-
-## 10. Environment Variables
-
-### Backend Configuration (`backend/.env`)
-| Variable | Required | Description |
-|---|---|---|
-| `PORT` | Optional | HTTP port for Express server (Default: `5000`) |
-| `CLIENT_URL` | Required | Allowed frontend client origin for CORS |
-| `DATABASE_URL` | Required | MongoDB connection string (Atlas or local instance) |
-| `JWT_SECRET` | Required | Cryptographic secret for signing JWT sessions |
-| `GOOGLE_CLIENT_ID` | Optional | Google Cloud OAuth 2.0 client ID for token verification |
-| `RESEND_API_KEY` | Optional | API key for transactional emails via Resend |
-| `RESEND_FROM_EMAIL` | Optional | Verified sender email address in Resend |
-| `RESEND_FROM_NAME` | Optional | Sender display name (e.g., `TrackMyHunt`) |
-| `groq_api_key` | Optional | Groq Cloud API key for AI Resume Analyzer |
-
-### Frontend Configuration (`frontend/.env`)
-| Variable | Required | Description |
-|---|---|---|
-| `VITE_BASE_BACKEND_URL` | Required | Base URL of the backend API (e.g. `http://localhost:5000`) |
-| `VITE_GOOGLE_CLIENT_ID` | Optional | Public Google OAuth client ID for web login button |
-
-### Extension Configuration (`extension/.env`)
-| Variable | Required | Description |
-|---|---|---|
-| `VITE_BASE_BACKEND_URL` | Required | Backend API base URL for saving jobs |
-| `VITE_BASE_FRONTEND_URL` | Required | Web app origin used for local token synchronization |
-
----
-
-## 11. Local Development & Installation
+Follow these steps to set up and run the entire TrackMyHunt platform locally on your machine.
 
 ### Prerequisites
-- Node.js `18.x` or higher
-- npm `9.x` or higher
-- MongoDB instance (local or MongoDB Atlas connection string)
-- Google Chrome browser (for loading the browser extension)
+- **Node.js**: `18.x` or higher
+- **npm**: `9.x` or higher
+- **MongoDB**: A running local instance (`mongodb://localhost:27017/trackmyhunt`) or a free [MongoDB Atlas](https://www.mongodb.com/atlas) connection string
+- **Google Chrome**: For loading and running the unpacked browser extension
 
-### 1. Backend Setup
+---
+
+### Step 1: Clone the Repository
 ```bash
-cd backend
-npm install
-cp .env.example .env
-# Edit .env with your DATABASE_URL, JWT_SECRET, RESEND_API_KEY, and groq_api_key
-npm run dev
+git clone https://github.com/ayushkhandelwal18/TrackMyHunt2.git
+cd TrackMyHunt2
 ```
-The backend API server will start on `http://localhost:5000` (or configured `PORT`).
 
-### 2. Frontend Setup
-```bash
-cd frontend
-npm install
-# Ensure frontend/.env has VITE_BASE_BACKEND_URL=http://localhost:5000
-npm run dev
-```
-The web dashboard will be available at `http://localhost:5173`.
+---
 
-### 3. Extension Setup
-```bash
-cd extension
-npm install
-npm run build
-```
-To load into Google Chrome:
-1. Navigate to `chrome://extensions/` in Chrome.
-2. Enable **Developer mode** via the top-right toggle switch.
-3. Click **Load unpacked**.
-4. Select the `TrackMyHunt/extension/dist` folder.
-5. Pin the TrackMyHunt extension and open any supported job page.
+### Step 2: Backend Setup & Execution
+The backend API server runs on Node.js, Express, and MongoDB.
 
-### 4. Running the Reminder Engine
-To manually execute a reminder cycle:
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create your `.env` configuration file:
+   ```bash
+   cp .env.example .env
+   ```
+4. Open `backend/.env` and fill in your variables (see [Environment Variables](#3-environment-variables--configuration) for examples):
+   - Set `DATABASE_URL` to your MongoDB connection string.
+   - Set `JWT_SECRET` to any strong random string.
+   - Set `CLIENT_URL` to `http://localhost:5173`.
+   - Set `PORT` to `3000` (or `5000`).
+   - (Optional) Set `groq_api_key` for the AI Resume Analyzer.
+   - (Optional) Set `RESEND_API_KEY` for email notifications and OTP verification.
+5. Start the backend development server:
+   ```bash
+   npm run dev
+   ```
+   The backend will start and listen at `http://localhost:3000` (or your configured `PORT`).
+
+---
+
+### Step 3: Frontend Setup & Execution
+The web application is built with React 19, Vite, and Tailwind CSS.
+
+1. Open a new terminal and navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create your `.env` file:
+   ```bash
+   # On Windows PowerShell:
+   New-Item -Path .env -ItemType File
+   # On macOS/Linux:
+   touch .env
+   ```
+4. Open `frontend/.env` and specify:
+   ```env
+   VITE_BASE_BACKEND_URL=http://localhost:3000
+   VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+   ```
+5. Start the frontend development server:
+   ```bash
+   npm run dev
+   ```
+   The web dashboard will open at `http://localhost:5173`.
+
+---
+
+### Step 4: Extension Setup & Installation in Chrome
+The extension is built with React 19, Vite, Tailwind CSS, and `@crxjs/vite-plugin`.
+
+1. Open a new terminal and navigate to the extension directory:
+   ```bash
+   cd extension
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Configure the extension `.env` file:
+   ```env
+   VITE_BASE_BACKEND_URL=http://localhost:3000
+   VITE_BASE_FRONTEND_URL=http://localhost:5173
+   ```
+4. Build the extension bundle:
+   ```bash
+   npm run build
+   ```
+   This generates the compiled extension in `extension/dist/`.
+5. Load the unpacked extension into Chrome:
+   - Open Google Chrome and navigate to `chrome://extensions/`.
+   - Enable **Developer mode** using the toggle switch in the top-right corner.
+   - Click the **Load unpacked** button in the top-left toolbar.
+   - Browse to your local project folder and select the `TrackMyHunt/extension/dist` directory.
+   - Pin the TrackMyHunt extension to your Chrome toolbar.
+   - Log into your local web dashboard at `http://localhost:5173`, then open any job posting (e.g., on LinkedIn) and click the extension icon to open the side panel.
+
+---
+
+### Step 5: (Optional) Run the Reminder Engine
+To manually execute one cycle of the background email reminder worker (for stale application follow-ups and interview alerts):
 ```bash
 cd backend
 npm run reminders
@@ -661,26 +144,372 @@ npm run reminders
 
 ---
 
-## 12. Testing & Quality Assurance
+## 3. Environment Variables & Configuration
 
-The codebase contains offline unit and integration test suites using the native Node.js test runner (`node:test`) and synthetic fixtures:
+Below is the complete list of environment variables used across the project with their exact variable names, required/optional status, descriptions, and concrete examples.
 
-### Backend Test Suite
+### 1. Backend Environment Variables (`backend/.env`)
+
+| Variable Name | Status | Purpose | Example Value |
+|---|---|---|---|
+| `PORT` | Optional | Port on which the Express API server listens (default: `5000`) | `3000` |
+| `CLIENT_URL` | Required | Allowed frontend origin for CORS and email redirect links | `http://localhost:5173` |
+| `DATABASE_URL` | Required | MongoDB database connection URI (Atlas or local) | `mongodb+srv://user:pass@cluster.mongodb.net/trackmyhunt` |
+| `JWT_SECRET` | Required | Secret key used to sign and verify JSON Web Tokens | `super_secret_jwt_key_987654321` |
+| `GOOGLE_CLIENT_ID` | Optional | Google OAuth 2.0 Client ID for server-side ID token verification | `691415752334-xxxxxx.apps.googleusercontent.com` |
+| `RESEND_API_KEY` | Optional | API key from Resend used to deliver transactional emails | `re_cANvWsFz_xxxxxxxxxxxxxxxxxxxx` |
+| `RESEND_FROM_EMAIL` | Optional | Verified sender email domain configured in Resend | `noreply@yourdomain.com` |
+| `RESEND_FROM_NAME` | Optional | Display name attached to outgoing emails | `TrackMyHunt` |
+| `groq_api_key` | Optional | Groq Cloud API key for the AI Resume & JD Analyzer (`openai/gpt-oss-120b`) | `gsk_yREpkXcQKxxxxxxxxxxxxxxxxxxxxxxx` |
+| `EMAIL_PROVIDER` | Optional | Email transport provider flag (legacy/fallback) | `resend` |
+| `EMAIL_USER` | Optional | SMTP username (legacy fallback) | `user@gmail.com` |
+| `EMAIL_PASS` | Optional | SMTP password or app-specific password (legacy fallback) | `app_password_here` |
+| `EMAIL_FROM` | Optional | Outgoing address for legacy SMTP delivery | `noreply@yourdomain.com` |
+
+#### Concrete `backend/.env` Example File:
+```env
+# Server & CORS
+PORT=3000
+CLIENT_URL=http://localhost:5173
+
+# Database & Authentication
+DATABASE_URL=mongodb+srv://admin:securepassword@cluster0.mongodb.net/trackmyhunt?retryWrites=true&w=majority
+JWT_SECRET=c2e8a1f4b9d0e7a3f5c6b8d1a4e7f0b3c5e8a1f4b9d0e7a3f5c6b8d1a4e7f0b3
+GOOGLE_CLIENT_ID=691415752334-1hhuta1mea909scm9vtg9nrqckqsdm09.apps.googleusercontent.com
+
+# Resend Email Configuration
+RESEND_API_KEY=re_123456789_abcdefghijklmnopqrstuvwxyz
+RESEND_FROM_EMAIL=noreply@trackmyhunt.com
+RESEND_FROM_NAME=TrackMyHunt
+
+# Groq Cloud AI Configuration (Note exact lowercase naming)
+groq_api_key=gsk_1234567890abcdefghijklmnopqrstuvwxyz
+```
+
+---
+
+### 2. Frontend Environment Variables (`frontend/.env`)
+
+| Variable Name | Status | Purpose | Example Value |
+|---|---|---|---|
+| `VITE_BASE_BACKEND_URL` | Required | Base URL where the backend Express API is running | `http://localhost:3000` |
+| `VITE_GOOGLE_CLIENT_ID` | Optional | Public Google OAuth Client ID for the Google Sign-In button | `691415752334-xxxxxx.apps.googleusercontent.com` |
+
+#### Concrete `frontend/.env` Example File:
+```env
+VITE_BASE_BACKEND_URL=http://localhost:3000
+VITE_GOOGLE_CLIENT_ID=691415752334-1hhuta1mea909scm9vtg9nrqckqsdm09.apps.googleusercontent.com
+```
+
+---
+
+### 3. Extension Environment Variables (`extension/.env`)
+
+| Variable Name | Status | Purpose | Example Value |
+|---|---|---|---|
+| `VITE_BASE_BACKEND_URL` | Required | Backend API base URL where the extension submits saved jobs | `http://localhost:3000` |
+| `VITE_BASE_FRONTEND_URL` | Required | Web dashboard origin used to synchronize the user's JWT token | `http://localhost:5173` |
+
+#### Concrete `extension/.env` Example File:
+```env
+# Local Development
+VITE_BASE_BACKEND_URL=http://localhost:3000
+VITE_BASE_FRONTEND_URL=http://localhost:5173
+
+# Production Deployment (Reference)
+# VITE_BASE_BACKEND_URL=https://api.trackmyhunt.com
+# VITE_BASE_FRONTEND_URL=https://trackmyhunt.vercel.app
+```
+
+---
+
+## 4. System Architecture & Component Notes
+
+Rather than maintaining a rigid monolithic diagram, TrackMyHunt is architected as clean, decoupled tiers with explicit interaction procedures:
+
+### Architectural Layers
+1. **Client Tier**:
+   - **Web Application**: React 19 single-page app built with Vite, Tailwind CSS 4, and React Router 7. Communicates with the backend using a centralized API client (`frontend/src/services/api.js`) that attaches JWT tokens automatically.
+   - **Browser Extension**: Manifest V3 side panel application built with React 19 and Tailwind CSS 3. Features an isolated multi-tier scraping engine and syncs authentication silently from active dashboard tabs.
+2. **Security & Ingress Layer**:
+   - **CORS Whitelist**: Whitelists the web application origin, Vercel preview URLs, `localhost`, and any installed Chrome extension origin (`chrome-extension://`).
+   - **Authentication Middleware (`auth.middleware.js`)**: Validates `Authorization: Bearer <JWT>` tokens and injects the authenticated `req.user` payload into downstream route handlers.
+3. **API & Business Services Layer**:
+   - **Controllers**: Handle HTTP input validation and pass business logic to dedicated services (`application.service.js`, `ai.service.js`, `reminder.service.js`, `auth.service.js`).
+   - **Duplicate Protection**: Automatically normalizes job URLs and company/role pairs, rejecting duplicates with HTTP 409 and returning existing records.
+   - **Timeline Scribe**: Automatically records an immutable snapshot in `ApplicationEvent` whenever an application is created or changes status.
+4. **Data Persistence Tier**:
+   - MongoDB database managed via Mongoose 9 schemas. Stores structured data for users, applications, timeline events, reminder markers, opportunities, skills, resources, notes, and resume links.
+5. **External Cloud Integrations**:
+   - **Groq Cloud API**: High-speed LLM inference running `openai/gpt-oss-120b` at `temperature: 0` for structured requirement and evidence extraction.
+   - **Resend API**: Transactional email delivery service for verification OTPs, welcome emails, follow-up digests, and interview alerts.
+   - **Google Identity Services**: OAuth 2.0 token verification for frictionless one-click user sign-in.
+
+---
+
+### Component Interaction Procedures
+
+#### Procedure A: Browser Extension Job Capture & Dashboard Sync
+1. The user navigates to an online job listing (e.g., on LinkedIn, Indeed, or an ATS page).
+2. The user opens the TrackMyHunt extension side panel.
+3. The content script inspects the page using a 4-tier cascade:
+   - **Tier 1**: JSON-LD `JobPosting` schema (highest confidence: 0.95).
+   - **Tier 2**: Platform-specific DOM scraper (confidence: 0.85).
+   - **Tier 3**: OpenGraph & Twitter meta tags (confidence: 0.60).
+   - **Tier 4**: DOM heuristic headings and text blocks (confidence: 0.50).
+4. The side panel displays the extracted data in an editable form.
+5. When the user clicks **Save to TrackMyHunt**, the extension sends a `POST /api/applications` request carrying the user's synced JWT token.
+6. The backend verifies that the job does not already exist for that user. If unique, it saves the application and records an event snapshot; if duplicate, it returns HTTP 409 with the existing record details.
+7. Upon a successful save, the extension emits a `trackmyhunt_job_saved` event to any open dashboard tabs, refreshing their display.
+
+#### Procedure B: AI Resume & Job Description Analysis
+1. The user visits `/ai-analyzer`, uploads their resume PDF, and pastes a target job description.
+2. The browser submits a `multipart/form-data` request to `POST /api/ai/analyze`.
+3. Multer buffers the PDF directly in server RAM (enforcing a strict 5 MB limit). The file is **never** written to disk.
+4. The server validates the magic bytes (`%PDF-`), extracts plain text using `pdf-parse`, and normalizes the text (NFKC Unicode normalization, stripping zero-width artifacts).
+5. A deterministic SHA-256 cache key is computed from `provider + model + prompt_version + userId + resumeHash + jdHash`.
+6. If cached, the report is returned immediately.
+7. If not cached, the backend invokes Groq (`openai/gpt-oss-120b`, temperature 0) with a strict evidence-mapping prompt. The model classifies candidate evidence without computing scores.
+8. The backend computes category breakdown scores and the overall score (0–100) deterministically using mathematical formulas, applies an ordinary-activity guard, and caches the result for 7 days.
+9. The user receives a comprehensive match report showing the fit level, score, matched skills, must-have gaps, good-to-have suggestions, and actionable recommendations.
+
+#### Procedure C: Scheduled Email Reminders
+1. An external scheduler (cron job or manual script execution) triggers `node scripts/send-reminders.js`.
+2. The script establishes a MongoDB connection and calls `runReminderCycle()`.
+3. **Follow-Up Digest Flow**:
+   - Queries users with `followupReminders: true`.
+   - Locates applications lingering in `Applied` status beyond the user's day threshold (default: 7 days).
+   - If the count meets the minimum pending threshold (default: 3), it atomically claims the markers using a unique `batchId`.
+   - Compiles a digest table and sends `followup-email.html` via Resend.
+   - Marks the claimed markers as `sent`.
+4. **Interview Alert Flow**:
+   - Queries users with `interviewReminders: true`.
+   - Checks applications in `Interview Scheduled` status due within the next 24 hours.
+   - Computes a unique slot fingerprint (`date|time|type|link`).
+   - Atomically claims the interview reminder marker with `batchId`.
+   - Renders `interview-email.html` and delivers the alert via Resend.
+   - Marks the marker as `sent`.
+
+---
+
+## 5. Core Features
+
+- **Authentication & Security**: Email & password signup with 6-digit OTP verification, Resend OTP support, password reset via OTP, Google OAuth 2.0 integration, and 30-day JWT sessions.
+- **Centralized Dashboard**: Real-time summary counts (Total, Active/Pending, Interviews, Rejections, Resumes), the 5 most recently updated applications, 5 upcoming opportunities, and skill proficiency breakdowns.
+- **Application Tracking**: Complete lifecycle management tracking company, role, employment type (`Intern`, `Full-Time`, `Remote`, `Freelance`, `Intern + Offer`, `Other`), skills, application link, notes, and application date.
+- **Seven Workflow Statuses**: `Applied`, `Resume Shortlisted`, `OA Done`, `Interview Scheduled`, `Interview Done`, `Rejected`, and `Other`.
+- **Status Details Capture**: Context-sensitive metadata for interviews (date, time, type: Technical/HR/Behavioral/Managerial/Other, meeting link, notes), online assessments (date, link, notes), and rejections (date, reason).
+- **Kanban Board**: Drag-and-drop board for visual stage management with automatic modal prompts to record status details during transitions.
+- **Application Detail & Immutable Timeline**: Dedicated page (`/applications/:id`) with an immutable chronological log (`ApplicationEvent`) recording state snapshots for every status change.
+- **Duplicate Application Prevention**: Backend checks compare incoming submissions against existing applications using normalized job URLs or normalized company and role combinations.
+- **Opportunity Planner**: Forward-looking pipeline for tracking prospective job openings and campus hiring cycles filtered by month, year, role, and type.
+- **Skillboard**: Self-assessed skills inventory categorized across `Beginner`, `Intermediate`, `Advanced`, and `Expert` levels with target role mappings.
+- **Resources Hub**: Curated reference library categorized by 12 resource types (`GitHub`, `YouTube`, `Blog`, `Article`, `Course`, `Website`, `Documentation`, `LinkedIn`, `Google Drive`, `Google Sheets`, `PDF`, `Other`).
+- **Notes & Brain Dump**: Timestamped markdown scratchpad for interview retrospectives, question breakdowns, and prep notes with multi-tag filtering.
+- **Resume Manager**: Link-based resume version catalog (Google Drive, Dropbox, portfolio links) mapped to individual applications without binary file bloat.
+- **AI Resume & JD Analyzer**: In-memory PDF upload and parsing, Groq LLM requirement mapping, deterministic backend scoring (0–100), fit level determination, and actionable improvement tips.
+- **Automated Email Reminders**: Idempotent background reminder worker sending stale application follow-up digests and 24-hour interview alerts via Resend.
+- **Chrome Companion Extension**: Manifest V3 side panel for instant job parsing, duplicate detection, and direct saving from supported job portals.
+
+---
+
+## 6. End-to-End Product Workflow
+
+The typical TrackMyHunt journey follows a streamlined, repeatable workflow:
+
+1. **Job Discovery**: The candidate finds a job opening on a job board (LinkedIn, Indeed, Naukri, Internshala) or an ATS portal (Greenhouse, Lever, Workday, Ashby).
+2. **Instant Capture**: Opening the TrackMyHunt extension side panel automatically extracts the role title, company name, location, employment type, and posting link.
+3. **Ingestion & Duplicate Guard**: The candidate reviews details in the side panel and clicks Save. The backend validates that the job is not already in the user's tracker before creating the record.
+4. **Tailoring & Analysis**: The candidate navigates to `/ai-analyzer`, uploads their resume PDF, and pastes the job description. The analyzer pinpoints missing technical requirements and recommends targeted improvements.
+5. **Application Submission**: The candidate submits their customized application on the employer's portal.
+6. **Pipeline Management**: As responses arrive, the candidate moves the job card across the Kanban board or updates it via the table view. When marking an interview or assessment, the candidate records dates, interviewers, and meeting links.
+7. **Timeline Tracking**: Each status shift logs an immutable historical event snapshot, visible on the application detail page.
+8. **Automated Follow-ups**: If an application sits idle in `Applied` status beyond the user's configured threshold (e.g., 7 days), or when an interview is 24 hours away, TrackMyHunt sends an email reminder via Resend.
+
+---
+
+## 7. Database Models & Schema Design
+
+All application data is modeled using Mongoose schemas on MongoDB:
+
+### 1. User (`User`)
+- `name` (String, required): User's full name.
+- `email` (String, required, unique): Account email address.
+- `password` (String): Hashed password (bcrypt).
+- `googleId` (String, sparse, unique): Google OAuth subject identifier.
+- `avatar` (String): Profile avatar image URL.
+- `isVerified` (Boolean, default: `false`): Verification status.
+- `otp` / `otpExpires`: Time-limited 6-digit OTP code and expiration timestamp.
+- `reminderSettings` (Object): Configuration for automated emails:
+  - `emailReminders` (Boolean, default: `false`): Master opt-in toggle.
+  - `followupReminders` (Boolean, default: `true`): Follow-up digest toggle.
+  - `followupAfterDays` (Number, default: `7`): Inactivity day threshold.
+  - `minPendingApplications` (Number, default: `3`): Minimum batch size for digest.
+  - `interviewReminders` (Boolean, default: `true`): Interview reminder toggle.
+  - `interviewReminderHours` (Number, default: `24`): Advance reminder window in hours.
+
+### 2. Application (`Application`)
+- `user` (ObjectId -> User, required): Reference to the owning user.
+- `company` (String, required): Hiring organization name.
+- `role` (String, required): Job title.
+- `type` (String, required, enum: `Intern`, `Full-Time`, `Remote`, `Freelance`, `Intern + Offer`, `Other`).
+- `skills` (String): Required or associated skills.
+- `status` (String, required, enum: `Applied`, `Resume Shortlisted`, `OA Done`, `Interview Scheduled`, `Interview Done`, `Rejected`, `Other`).
+- `applicationLink` (String): URL of the job posting or application portal.
+- `notes` (String): Personal notes.
+- `appliedDate` (Date, required): Date when applied.
+- `resumeId` (ObjectId -> Resume, optional): Mapped resume catalog item.
+- `statusDetails` (Object):
+  - `interview`: `date`, `time`, `type` (`Technical`, `HR`, `Behavioral`, `Managerial`, `Other`), `link`, `notes`.
+  - `oa`: `date`, `link`, `notes`.
+  - `rejection`: `date`, `reason`.
+
+### 3. Application Event (`ApplicationEvent`)
+- `user` (ObjectId -> User, required): Owning user.
+- `application` (ObjectId -> Application, required): Target application.
+- `type` (String, enum: `created`, `status_changed`): Event type.
+- `fromStatus` / `toStatus` (String): Prior and updated status states.
+- `snapshot` (Object): Preserves status, mapped resume title, and status details as they existed at event time.
+
+### 4. Reminder Marker (`Reminder`)
+- `user` (ObjectId -> User, required): Target user.
+- `application` (ObjectId -> Application, required): Associated application.
+- `type` (String, enum: `followup`, `interview`): Reminder classification.
+- `fingerprint` (String): Unique hash for interview slots (`date|time|type|link`).
+- `remindAt` (Date): Due timestamp in UTC.
+- `status` (String, enum: `pending`, `claimed`, `sent`, `cancelled`): State machine.
+- `batchId` (ObjectId): Claim token for the active scheduler run.
+- `sentAt` (Date): Delivery timestamp.
+
+### 5. Other Entities
+- **Opportunity (`Opportunity`)**: `user`, `company`, `role`, `type`, `openingMonth`, `openingYear`, `skills`, `link`, `notes`.
+- **Skill (`Skill`)**: `user`, `name`, `category`, `proficiency` (`Beginner`, `Intermediate`, `Advanced`, `Expert`), `target`.
+- **Resource (`Resource`)**: `user`, `title`, `type` (12 categories: `GitHub`, `YouTube`, `Blog`, `Article`, etc.), `link`, `description`.
+- **Note (`Note`)**: `user`, `title`, `content`, `tags`, `date`.
+- **Resume (`Resume`)**: `user`, `title`, `link`, `description`, `createdAt`.
+
+---
+
+## 8. AI Resume & JD Analyzer Pipeline
+
+The AI Resume & JD Analyzer is engineered around privacy, consistency, and explainability:
+
+### Step-by-Step Execution
+1. **Memory-Only File Ingestion**: The candidate uploads a resume PDF alongside a job description. Multer stores the file in memory buffer only (max 5 MB). The file is rejected if magic bytes do not match `%PDF-`.
+2. **Text Normalization**: `pdf-parse` extracts raw text, which is normalized using Unicode NFKC normalization, removing zero-width characters and excessive whitespace.
+3. **SHA-256 Fingerprinting**: A deterministic cache key is generated combining `provider + model + prompt_version + userId + resumeHash + jdHash`. If identical content was analyzed previously, the result is served from cache instantly.
+4. **LLM Evidence Extraction**: Groq runs `openai/gpt-oss-120b` with `temperature: 0` and `response_format: { type: "json_object" }`. The model acts strictly as an evidence extractor:
+   - Identifies explicit requirements from the JD.
+   - Classifies resume evidence as `direct`, `partial`, or `none`.
+   - Categorizes requirements (Skills, Role Relevance, Experience, Education, Domain Alignment).
+5. **Deterministic Backend Math**: The backend validates all extracted items, applies an ordinary-activity guard to prevent penalizing candidates for generic workplace tasks, and calculates category breakdown scores and the overall score (0–100) mathematically.
+6. **Result Presentation**: Returns a structured report containing:
+   - `overallScore`: Computed integer (0–100).
+   - `fitLevel`: `Strong Fit` (>=80), `Moderate Fit` (65-79), `Low Fit` (45-64), or `Not a Fit` (<45).
+   - `summary`: High-level evaluation summary.
+   - `matchedSkills`: Up to 10 verified candidate capabilities.
+   - `missingSkills`: Up to 5 must-have gaps.
+   - `goodToHaveImprovements`: Up to 8 optional suggestions.
+   - `recommendation`: Concrete next steps for the candidate.
+
+---
+
+## 9. Email Reminders & Background Subsystem
+
+The email reminder system operates through external scheduler execution:
+
+### Trigger Command
+```bash
+node scripts/send-reminders.js
+```
+*Note: In production, execute this command on a recurring schedule (e.g., hourly or daily via Render Cron, GitHub Actions, or Linux cron).*
+
+### Idempotency & Batch Claim Protocol
+1. **Zero Double-Sends**: Reminders use a two-phase commit protocol. Records are upserted as `pending` with a unique compound index (`user + application + type + fingerprint`).
+2. **Batch Ownership**: A scheduler run generates an atomic `batchId` and claims all eligible `pending` records. Only records stamped with that run's `batchId` are processed and emailed.
+3. **Slot Fingerprinting**: Interview reminders are fingerprinted against `date|time|type|link`. If an interview is rescheduled, the old fingerprint no longer matches, preventing stale or duplicate emails.
+4. **Resend HTML Delivery**: Renders responsive HTML templates (`followup-email.html` and `interview-email.html`) and delivers them through the Resend API.
+
+---
+
+## 10. REST API Specification
+
+All protected endpoints require an `Authorization: Bearer <JWT>` header.
+
+### Authentication (`/api/auth`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/signup` | Public | Register new user and send verification OTP |
+| `POST` | `/api/auth/verify-otp` | Public | Verify registration OTP and issue JWT |
+| `POST` | `/api/auth/resend-otp` | Public | Resend 6-digit verification code |
+| `POST` | `/api/auth/login` | Public | Authenticate with email & password |
+| `POST` | `/api/auth/google` | Public | Authenticate with Google OAuth ID token |
+| `POST` | `/api/auth/forgot-password` | Public | Request password reset OTP email |
+| `POST` | `/api/auth/reset-password` | Public | Verify reset OTP and set new password |
+
+### User Management (`/api/user`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `PUT` | `/api/user/profile` | Protected | Update user profile details |
+| `PUT` | `/api/user/password` | Protected | Change password (requires old password) |
+| `DELETE` | `/api/user/account` | Protected | Permanently delete account and all data |
+| `GET` | `/api/user/reminders` | Protected | Retrieve email reminder preferences |
+| `PUT` | `/api/user/reminders` | Protected | Update reminder toggles and thresholds |
+
+### Applications (`/api/applications`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/applications` | Protected | Fetch all applications for the user |
+| `POST` | `/api/applications` | Protected | Create application (with duplicate protection) |
+| `PUT` | `/api/applications/:id` | Protected | Update application fields or status details |
+| `DELETE` | `/api/applications/:id` | Protected | Delete application and clean up events |
+| `GET` | `/api/applications/:id/events` | Protected | Get immutable status history timeline |
+
+### Opportunity Planner (`/api/opportunities`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/opportunities` | Protected | Fetch upcoming prospective opportunities |
+| `POST` | `/api/opportunities` | Protected | Create planned opportunity record |
+| `PUT` | `/api/opportunities/:id` | Protected | Update planned opening details |
+| `DELETE` | `/api/opportunities/:id` | Protected | Remove planned opportunity |
+
+### Skills, Resources, Notes, Resumes & Dashboard
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` / `POST` | `/api/skills` | Protected | List or create self-assessed skills |
+| `PUT` / `DELETE` | `/api/skills/:id` | Protected | Update or delete skill entry |
+| `GET` / `POST` | `/api/resources` | Protected | List or create reference links |
+| `PUT` / `DELETE` | `/api/resources/:id` | Protected | Update or delete resource entry |
+| `GET` / `POST` | `/api/notes` | Protected | List or create preparation notes |
+| `PUT` / `DELETE` | `/api/notes/:id` | Protected | Update or delete note |
+| `GET` / `POST` | `/api/resumes` | Protected | List or create resume links |
+| `PUT` / `DELETE` | `/api/resumes/:id` | Protected | Update or delete resume entry |
+| `GET` | `/api/dashboard` | Protected | Retrieve aggregated metrics and recent items |
+| `POST` | `/api/ai/analyze` | Protected | Multipart upload (`resumePdf` + `jobDescription`) |
+
+---
+
+## 11. Testing & Verification
+
+TrackMyHunt includes offline test suites using the native Node.js test runner (`node:test`) and synthetic DOM fixtures.
+
+### Running Backend Tests
 ```bash
 cd backend
 npm test
 ```
-The test suite executes offline without external network calls:
-- `tests/ai-analyzer.test.js`: Verifies deterministic scoring mathematics, activity guarding, validation guards, and Groq response mapping.
-- `tests/ai-upload.test.js`: Validates multipart memory upload constraints, file size limits (5 MB cap), and PDF MIME/extension verification.
-- `tests/resume-extract.test.js`: Tests binary PDF parsing, corrupt buffer detection, and text normalization.
-- `tests/reminder.test.js`: Verifies reminder window eligibility, interview fingerprinting, and atomic batch claiming idempotency.
-- `tests/email-templates.test.js`: Asserts HTML escaping and template variable substitution for notification emails.
+Executes 96 unit and integration tests across 5 test suites:
+- `tests/ai-analyzer.test.js`: Verifies deterministic scoring, activity guarding, and Groq response mapping.
+- `tests/ai-upload.test.js`: Asserts 5 MB file limits, magic byte validation, and MIME filtering.
+- `tests/resume-extract.test.js`: Tests binary PDF extraction and text normalization.
+- `tests/reminder.test.js`: Tests reminder eligibility windows, slot fingerprinting, and atomic batch claiming.
+- `tests/email-templates.test.js`: Asserts HTML escaping and template variable substitution.
 
-### Extension Test Suite
+### Running Extension Tests & Linter
 ```bash
 cd extension
 npm test
 npm run lint
 ```
-- `test/linkedin.test.mjs`: Tests DOM scraping heuristics and fallback selectors against synthetic job search DOM fixtures (`test/fakeDom.mjs`) without requiring a live browser.
+- Executes offline scraper tests (`test/linkedin.test.mjs`) against synthetic search and detail DOM fixtures (`test/fakeDom.mjs`) without requiring a live browser.
+- Runs `oxlint` for high-speed static code analysis.
