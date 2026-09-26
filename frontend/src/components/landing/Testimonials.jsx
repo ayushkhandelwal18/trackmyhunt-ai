@@ -1,23 +1,31 @@
 import { Quote } from "lucide-react";
 
-// Placeholder sample quotes. Replace each `quote` with the student's actual
-// feedback before publishing — no verified testimonial text exists yet.
-// Only this array needs to change; the layout stays the same.
+
 const TESTIMONIALS = [
   {
-    name: "Keshab Kashyap",
-    detail: "B.Tech CSE — IIIT Kota",
-    quote: "Sample student feedback — replace this with Keshab's actual feedback before publishing.",
+    name: "Ankit Kumar",
+    detail: "Mern Stack Developer",
+    quote: "TrackMyHunt makes it much easier to keep my job applications organized and track where I am in the process.",
   },
   {
-    name: "Arthav Jain",
-    detail: "B.Tech ECE — IIIT Kota",
-    quote: "Sample student feedback — replace this with Arthav's actual feedback before publishing.",
+    name: "Rohit Kumar",
+    detail: "B.Tech Student",
+    quote: "Having applications, opportunities, and preparation resources in one place makes the job search much easier to manage.",
   },
   {
-    name: "N.S. Santosh",
-    detail: "B.Tech ECE — IIIT Kota",
-    quote: "Sample student feedback — replace this with Santosh's actual feedback before publishing.",
+    name: "Rishabh Sharma",
+    detail: "Aspiring Software Engineer",
+    quote: "The centralized application tracking makes it easier to stay organized instead of maintaining everything across different notes and spreadsheets.",
+  },
+  {
+    name: "Ayush Kumar",
+    detail: "B.Tech Student",
+    quote: "The Kanban-style workflow gives a clear view of which applications are still pending and which ones need attention.",
+  },
+  {
+    name: "Minakshi Sharma",
+    detail: "Upcoming SDE Intern",
+    quote: "The resume analyzer and application tracking features make the overall job-hunting workflow more structured and easier to follow.",
   },
 ];
 

@@ -40,11 +40,7 @@ function Footer() {
                 <Github size={14} /> Extension on GitHub
               </a>
             </li>
-            <li>
-              <a href="https://x.com/ak_h2518" target="_blank" rel="noopener noreferrer" style={{ color: "var(--muted)" }}>
-                X / Twitter
-              </a>
-            </li>
+
           </ul>
         </div>
       </div>

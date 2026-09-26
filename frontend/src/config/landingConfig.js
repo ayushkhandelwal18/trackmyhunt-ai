@@ -1,5 +1,5 @@
 export const TRACKMYHUNT_EXTENSION_GITHUB_URL =
-  "https://github.com/ayushkhandelwal18/TrackMyHunt/tree/main/extension";
+  "https://github.com/ayushkhandelwal18/TrackMyHunt-Extension";
 
 export const landingNavigation = [
   { label: "Features", href: "#features" },
