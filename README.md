@@ -1,6 +1,8 @@
 # TrackMyHunt
 
-TrackMyHunt is an end-to-end job search management and application tracking platform designed for students, new graduates, and active job seekers. It centralizes fragmented job-hunting activities into a unified workspace, providing full-lifecycle application management, interview timeline tracking, future opportunity planning, skill gap organization, interview notes, link-based resume cataloging, and an explainable AI Resume and Job Description Analyzer. The platform is paired with a companion Chrome extension that extracts structured job postings directly from portal tabs and saves them to the central dashboard with duplicate detection.
+TrackMyHunt is an  job hunt management and application tracking platform designed for students, and active job seekers. It centralizes fragmented job-hunting activities into a unified workspace, providing full-lifecycle application management, interview timeline tracking, future opportunity planning, skill gap organization, interview notes, link-based resume cataloging, and an explainable AI Resume and Job Description Analyzer. 💼
+
+The platform is paired with a companion Chrome extension that extracts structured job postings directly from portal tabs and saves them to the central dashboard with duplicate detection.
 
 ---
 
