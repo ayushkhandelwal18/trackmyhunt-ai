@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, FileText, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, FileText, ExternalLink, Pencil, Trash2, Copy, Check } from "lucide-react";
 import { getResumes, addResume, deleteResume, updateResume, getApplications } from "../services/api";
 import PageHeader from "../components/ui/PageHeader";
 import AppButton from "../components/ui/AppButton";
@@ -10,6 +10,109 @@ import ErrorState from "../components/ui/ErrorState";
 import Modal from "../components/ui/Modal";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { Field, TextInput, Textarea } from "../components/ui/FormField";
+
+function ResumeCard({ resume, usageCount, onEdit, onDelete }) {
+  const [copyState, setCopyState] = useState("idle");
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  async function handleCopy() {
+    if (!resume.link) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    try {
+      if (!navigator?.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(resume.link);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+    timerRef.current = setTimeout(() => setCopyState("idle"), 1600);
+  }
+
+  return (
+    <AppCard className="flex h-full flex-col p-5">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div
+          style={{
+            display: "grid",
+            placeItems: "center",
+            height: 36,
+            width: 36,
+            borderRadius: 10,
+            background: "var(--brand-soft)",
+            border: "1px solid var(--brand-border)",
+            color: "var(--brand)",
+          }}
+        >
+          <FileText size={17} />
+        </div>
+        <div className="flex gap-1.5">
+          <button type="button" onClick={onEdit} className="app-icon-button" aria-label={`Edit ${resume.title}`}>
+            <Pencil size={15} />
+          </button>
+          <button type="button" onClick={onDelete} className="app-icon-button danger" aria-label={`Delete ${resume.title}`}>
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+
+      <h3 style={{ margin: "0 0 4px", fontSize: "0.93rem", fontWeight: 700, color: "var(--text-strong)" }}>
+        {resume.title}
+      </h3>
+      {resume.description ? (
+        <p style={{ margin: "0 0 0.4rem", fontSize: "0.82rem", lineHeight: 1.6, color: "var(--muted)" }} className="line-clamp-2 flex-1">
+          {resume.description}
+        </p>
+      ) : (
+        <div className="flex-1" />
+      )}
+      {usageCount > 0 && (
+        <p style={{ margin: "0 0 0.8rem", fontSize: "0.75rem", color: "var(--faint)" }}>
+          Used in {usageCount} application{usageCount === 1 ? "" : "s"}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between gap-2 flex-wrap" style={{ borderTop: "1px solid var(--border)", paddingTop: "0.8rem", fontSize: "0.75rem", color: "var(--faint)" }}>
+        <span>{resume.createdAt ? new Date(resume.createdAt).toLocaleDateString() : ""}</span>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={handleCopy}
+            title="Copy link"
+            aria-label={`Copy link for ${resume.title}`}
+            aria-live="polite"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.8rem", fontWeight: 600, color: "var(--brand)", background: "none", border: "none", cursor: "pointer", padding: "6px 4px" }}
+          >
+            {copyState === "copied" ? (
+              <>
+                <Check size={13} /> Copied!
+              </>
+            ) : copyState === "error" ? (
+              <>Copy failed</>
+            ) : (
+              <>
+                <Copy size={13} /> Copy link
+              </>
+            )}
+          </button>
+          <a
+            href={resume.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.8rem", fontWeight: 600, color: "var(--brand)", padding: "6px 0 6px 4px" }}
+          >
+            Open link <ExternalLink size={13} />
+          </a>
+        </div>
+      </div>
+    </AppCard>
+  );
+}
 
 function Resumes() {
   const [resumes, setResumes] = useState([]);
@@ -136,60 +239,13 @@ function Resumes() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {resumes.map((resume) => (
-            <AppCard key={resume._id} className="flex h-full flex-col p-5">
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div
-                  style={{
-                    display: "grid",
-                    placeItems: "center",
-                    height: 36,
-                    width: 36,
-                    borderRadius: 10,
-                    background: "var(--brand-soft)",
-                    border: "1px solid var(--brand-border)",
-                    color: "var(--brand)",
-                  }}
-                >
-                  <FileText size={17} />
-                </div>
-                <div className="flex gap-1.5">
-                  <button type="button" onClick={() => openEditModal(resume)} className="app-icon-button" aria-label={`Edit ${resume.title}`}>
-                    <Pencil size={15} />
-                  </button>
-                  <button type="button" onClick={() => setDeleteTarget(resume)} className="app-icon-button danger" aria-label={`Delete ${resume.title}`}>
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-
-              <h3 style={{ margin: "0 0 4px", fontSize: "0.93rem", fontWeight: 700, color: "var(--text-strong)" }}>
-                {resume.title}
-              </h3>
-              {resume.description ? (
-                <p style={{ margin: "0 0 0.4rem", fontSize: "0.82rem", lineHeight: 1.6, color: "var(--muted)" }} className="line-clamp-2 flex-1">
-                  {resume.description}
-                </p>
-              ) : (
-                <div className="flex-1" />
-              )}
-              {usageCounts[resume._id] > 0 && (
-                <p style={{ margin: "0 0 0.8rem", fontSize: "0.75rem", color: "var(--faint)" }}>
-                  Used in {usageCounts[resume._id]} application{usageCounts[resume._id] === 1 ? "" : "s"}
-                </p>
-              )}
-
-              <div className="flex items-center justify-between" style={{ borderTop: "1px solid var(--border)", paddingTop: "0.8rem", fontSize: "0.75rem", color: "var(--faint)" }}>
-                <span>{resume.createdAt ? new Date(resume.createdAt).toLocaleDateString() : ""}</span>
-                <a
-                  href={resume.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: "0.8rem", fontWeight: 600, color: "var(--brand)" }}
-                >
-                  Open link <ExternalLink size={13} />
-                </a>
-              </div>
-            </AppCard>
+            <ResumeCard
+              key={resume._id}
+              resume={resume}
+              usageCount={usageCounts[resume._id] || 0}
+              onEdit={() => openEditModal(resume)}
+              onDelete={() => setDeleteTarget(resume)}
+            />
           ))}
         </div>
       )}
