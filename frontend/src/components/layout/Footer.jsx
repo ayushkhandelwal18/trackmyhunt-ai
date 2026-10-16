@@ -1,51 +1,61 @@
-import { Github, Mail, Crosshair } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ArrowRight, Github, Mail, Crosshair } from "lucide-react";
 import { TRACKMYHUNT_EXTENSION_GITHUB_URL } from "../../config/landingConfig";
 
 function Footer() {
   return (
     <footer style={{ borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
-      <div className="landing-container grid gap-6 py-8 md:grid-cols-[1.4fr_1fr_1fr] md:gap-8 md:py-10">
+      <div className="landing-container grid gap-8 py-10 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:py-12">
         <div>
           <div className="flex items-center gap-2">
-            <span style={{ display: "grid", placeItems: "center", height: 26, width: 26, borderRadius: 8, background: "var(--brand)", color: "#fff" }}>
-              <Crosshair size={14} />
+            <span style={{ display: "grid", placeItems: "center", height: 28, width: 28, borderRadius: 8, background: "var(--brand)", color: "#fff" }}>
+              <Crosshair size={15} />
             </span>
-            <span style={{ fontWeight: 800, color: "var(--text-strong)" }}>TrackMyHunt</span>
+            <span style={{ fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-strong)" }}>TrackMyHunt</span>
           </div>
           <p className="mt-3 max-w-xs text-sm leading-6" style={{ color: "var(--muted)" }}>
             A focused job-search workspace for students. Track applications, analyze your resume against job descriptions, and stay on top of every deadline.
           </p>
+          <Link to="/auth" className="app-button app-button-primary mt-5">
+            Get started free <ArrowRight size={15} />
+          </Link>
         </div>
-        <div>
-          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-strong)" }}>Product</h4>
+        <nav aria-label="Product">
+          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--faint)" }}>Product</h4>
           <ul className="space-y-2.5 text-sm" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            <li><a href="#features" style={{ color: "var(--muted)" }}>Features</a></li>
-            <li><a href="#analyzer" style={{ color: "var(--muted)" }}>AI Resume Analyzer</a></li>
-            <li><a href="#howitworks" style={{ color: "var(--muted)" }}>How it works</a></li>
-            <li><a href="#stories" style={{ color: "var(--muted)" }}>Testimonials</a></li>
-            <li><Link to="/auth" style={{ color: "var(--muted)" }}>Login / Signup</Link></li>
+            <li><a className="footer-link" href="#features">The workspace</a></li>
+            <li><a className="footer-link" href="#tracker">Application tracker</a></li>
+            <li><a className="footer-link" href="#analyzer">AI Resume Analyzer</a></li>
+            <li><a className="footer-link" href="#workspace">Preparation workspace</a></li>
           </ul>
-        </div>
+        </nav>
+        <nav aria-label="Resources">
+          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--faint)" }}>Resources</h4>
+          <ul className="space-y-2.5 text-sm" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            <li><a className="footer-link" href="#howitworks">How it works</a></li>
+            <li><a className="footer-link" href="#extension">Browser extension</a></li>
+            <li><Link className="footer-link" to="/auth">Login / Signup</Link></li>
+          </ul>
+        </nav>
         <div>
-          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.82rem", fontWeight: 700, color: "var(--text-strong)" }}>Connect</h4>
-          <ul className="space-y-2.5 text-sm" style={{ listStyle: "none", margin: 0, padding: 0, color: "var(--muted)" }}>
+          <h4 style={{ margin: "0 0 0.8rem", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--faint)" }}>Connect</h4>
+          <ul className="space-y-2.5 text-sm" style={{ listStyle: "none", margin: 0, padding: 0 }}>
             <li>
-              <a href="mailto:ayushdev186@gmail.com" style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--muted)" }}>
+              <a className="footer-link" href="mailto:ayushdev186@gmail.com" style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                 <Mail size={14} /> ayushdev186@gmail.com
               </a>
             </li>
             <li>
-              <a href={TRACKMYHUNT_EXTENSION_GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 7, color: "var(--muted)" }}>
+              <a className="footer-link" href={TRACKMYHUNT_EXTENSION_GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                 <Github size={14} /> Extension on GitHub
               </a>
             </li>
-
           </ul>
         </div>
       </div>
-      <div className="landing-container border-t py-5 text-sm" style={{ borderColor: "var(--border)", color: "var(--faint)" }}>
-        © {new Date().getFullYear()} TrackMyHunt. All rights reserved.
+      <div className="landing-container flex flex-col gap-1 border-t py-5 text-sm sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border)", color: "var(--faint)" }}>
+        <span>© {new Date().getFullYear()} TrackMyHunt. All rights reserved.</span>
+        <span className="text-xs">Free for job seekers · Built for focused job hunting</span>
       </div>
     </footer>
   );

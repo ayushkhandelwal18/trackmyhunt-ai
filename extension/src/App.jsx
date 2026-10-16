@@ -66,6 +66,43 @@ const labelStyle = {
 
 const SUPPORTED_PLATFORMS = ['LinkedIn', 'Indeed', 'Naukri', 'Internshala', 'Greenhouse', 'Lever', 'Workday', 'Ashby', 'Wellfound'];
 
+// Panel-side copy of the content-script platform labels (used when the
+// scrape response or cache entry carries a platform id without a label).
+const PLATFORM_LABELS = {
+  linkedin: 'LinkedIn',
+  indeed: 'Indeed',
+  naukri: 'Naukri',
+  internshala: 'Internshala',
+  wellfound: 'Wellfound',
+  greenhouse: 'Greenhouse',
+  lever: 'Lever',
+  workday: 'Workday',
+  ashby: 'Ashby',
+  google_forms: 'Google Form',
+  company_careers: 'Career page',
+  generic: 'Web page',
+};
+
+function getBackendBase() {
+  return (import.meta.env.VITE_BASE_BACKEND_URL || '').replace(/\/$/, '');
+}
+
+function todayDateString() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// Fill backend-compatible defaults for a fresh scrape without inventing
+// job content: status defaults to Applied, date to today, resume unmapped.
+function withDefaults(data) {
+  if (!data) return data;
+  return {
+    ...data,
+    status: data.status || 'Applied',
+    appliedDate: data.appliedDate || todayDateString(),
+    resumeId: data.resumeId || '',
+  };
+}
+
 function getFrontendBase() {
   return (import.meta.env.VITE_BASE_FRONTEND_URL || 'http://localhost:5173/').replace(/\/$/, '');
 }
@@ -96,6 +133,9 @@ function App() {
   // Kept separate from auth (token null) and from save status below.
   const [phase, setPhase] = useState('scanning');
   const [jobData, setJobData] = useState(null);
+  const [platformLabel, setPlatformLabel] = useState('');
+  const [resumes, setResumes] = useState([]);
+  const [resumesLoaded, setResumesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null);
   const [savedId, setSavedId] = useState(null);
@@ -137,6 +177,33 @@ function App() {
 
   const getDashboardToken = () => getTokenFromDashboardTabs();
 
+  // Saved resumes for the optional "Resume used" dropdown. Best-effort:
+  // failures hide the dropdown (it stays optional) without blocking capture.
+  const loadResumes = async (authToken) => {
+    const backend = getBackendBase();
+    if (!backend || !authToken) return;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(`${backend}/api/resumes`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!response.ok) return;
+      const body = await response.json().catch(() => null);
+      const list = Array.isArray(body?.resumes) ? body.resumes : Array.isArray(body) ? body : [];
+      setResumes(
+        list
+          .filter((r) => r && (r._id || r.id) && r.title)
+          .map((r) => ({ id: String(r._id || r.id), title: String(r.title) }))
+      );
+      setResumesLoaded(true);
+    } catch {
+      // Offline/backend unreachable: no resume dropdown, capture still works.
+    }
+  };
+
   // Scrape the given tab: content script first, injected fallback second.
   // Returns { ok, data, platform, tabId, url } — never throws.
   const scrapeTab = (tab) => new Promise((resolve) => {
@@ -157,7 +224,12 @@ function App() {
       chrome.tabs.sendMessage(tab.id, { action: 'scrape_job' }, (response) => {
         void chrome.runtime.lastError;
         if (response && response.success && response.data) {
-          finish({ ok: true, data: response.data, platform: response.platform || 'generic' });
+          finish({
+            ok: true,
+            data: response.data,
+            platform: response.platform || 'generic',
+            platformLabel: response.platformLabel || null,
+          });
           return;
         }
         // No listener (tab predates extension load) or scraper threw:
@@ -206,6 +278,9 @@ function App() {
     }
   };
 
+  const labelOf = (result) =>
+    (result && (result.platformLabel || PLATFORM_LABELS[result.platform])) || '';
+
   const applyScrapeResult = (result) => {
     if (result.ok && !isListingResult(result.data)) {
       const key = jobKeyOf(result.data);
@@ -215,13 +290,15 @@ function App() {
         setStatus(null);
       }
       currentJobKey.current = key;
-      setJobData(result.data);
+      setJobData(withDefaults(result.data));
+      setPlatformLabel(labelOf(result));
       setPhase('ready');
       setSavedId(null);
       pushCache(result);
       return;
     }
     setJobData(null);
+    setPlatformLabel('');
     if (result.reason === 'connection' || result.reason === 'timeout' || result.reason === 'no-tab') {
       setPhase('conn-error');
       return;
@@ -269,7 +346,8 @@ function App() {
           url: tab.url,
         });
         if (cached && cached.entry && hasJobContent(cached.entry.data)) {
-          setJobData(cached.entry.data);
+          setJobData(withDefaults(cached.entry.data));
+          setPlatformLabel(PLATFORM_LABELS[cached.entry.platform] || '');
           setPhase('ready');
         }
       } catch {
@@ -287,6 +365,7 @@ function App() {
       if (cancelled) return;
       if (dashboardToken) {
         setToken(dashboardToken);
+        loadResumes(dashboardToken);
         handleScrape();
       } else {
         setToken(null);
@@ -299,10 +378,12 @@ function App() {
       if (changes.token) {
         if (changes.token.newValue) {
           setToken(changes.token.newValue);
+          loadResumes(changes.token.newValue);
           handleScrape();
         } else {
           setToken(null);
           setJobData(null);
+          setPlatformLabel('');
           setPhase('scanning');
           currentJobKey.current = null;
           showToast(null, null);
@@ -346,6 +427,7 @@ function App() {
     // The website session is untouched (log out there to end it fully).
     setToken(null);
     setJobData(null);
+    setPlatformLabel('');
     showToast(null, null);
     setSavedId(null);
     setPhase('scanning');
@@ -371,14 +453,17 @@ function App() {
     const validTypes = ['Intern', 'Full-Time', 'Remote', 'Freelance', 'Intern + Offer', 'Other'];
     const validStatuses = ['Applied', 'Resume Shortlisted', 'OA Done', 'Interview Scheduled', 'Interview Done', 'Rejected', 'Other'];
 
-    // The backend stores company/role/type/status/link/notes/date only, so
-    // extra captured context (location, work mode, salary, department) is
-    // appended to notes as a labeled Details line instead of being dropped.
-    const detailParts = [jobData.location, jobData.workMode, jobData.salary, jobData.department]
+    // Notes carry what the backend has no separate field for: the captured
+    // location gets its own labeled line, remaining context follows as
+    // Details. Nothing is invented — only captured values are appended.
+    const location = String(jobData.location || '').trim();
+    const extras = [jobData.workMode, jobData.salary, jobData.department]
       .map((part) => String(part || '').trim())
       .filter(Boolean);
     const baseNotes = (jobData.notes || 'Saved via TrackMyHunt Browser Extension').trim();
-    const notes = detailParts.length ? `${baseNotes}\n\nDetails: ${detailParts.join(' · ')}` : baseNotes;
+    const notesLines = [baseNotes];
+    if (location) notesLines.push(`Location: ${location}`);
+    if (extras.length) notesLines.push(`Details: ${extras.join(' · ')}`);
 
     const payload = {
       company,
@@ -386,9 +471,16 @@ function App() {
       type: validTypes.includes(jobData.type) ? jobData.type : 'Other',
       status: validStatuses.includes(jobData.status) ? jobData.status : 'Applied',
       applicationLink: jobData.applicationLink || '',
-      notes,
-      appliedDate: jobData.appliedDate || new Date().toISOString()
+      notes: notesLines.join('\n'),
+      appliedDate: jobData.appliedDate || todayDateString(),
     };
+    // Optional resume mapping: only a real saved-resume id is sent. The
+    // backend re-checks ownership, so a stale selection can never leak
+    // another user's resume — it fails closed with a clear error instead.
+    const selectedResumeId = String(jobData.resumeId || '').trim();
+    if (/^[a-f0-9]{24}$/i.test(selectedResumeId)) {
+      payload.resumeId = selectedResumeId;
+    }
 
     chrome.runtime.sendMessage({ action: 'save_job', data: payload, authToken: token }, (response) => {
       setSaving(false);
@@ -400,9 +492,9 @@ function App() {
         const createdId = response.data && (response.data._id || response.data.id);
         setSavedId(createdId || null);
         // Form stays open and editable; the toast dismisses itself.
-        showToast('success', 'Saved to Dashboard');
+        showToast('success', 'Saved to TrackMyHunt');
       } else if (response && response.duplicate) {
-        showToast('info', 'Already saved to Dashboard');
+        showToast('info', 'Already saved to TrackMyHunt');
       } else if (response && /session has expired|log in/i.test(response.error || '')) {
         // Token is dead (background already cleared its copy): fall back to login.
         setToken(null);
@@ -615,6 +707,30 @@ function App() {
                     {[jobData.location, jobData.type].filter(Boolean).join(' · ')}
                   </p>
                 )}
+                <div className="flex items-center min-w-0" style={{ gap: '0.4rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  {platformLabel && (
+                    <span
+                      style={{
+                        fontSize: '0.68rem', fontWeight: 700, color: 'var(--brand)',
+                        border: '1px solid var(--brand-border)', borderRadius: 999,
+                        padding: '0.15rem 0.55rem', background: 'var(--brand-soft)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {platformLabel} · auto-detected
+                    </span>
+                  )}
+                  {jobData.applicationLink && (
+                    <a
+                      href={jobData.applicationLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--muted)' }}
+                    >
+                      Open listing
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </article>
@@ -678,12 +794,40 @@ function App() {
                 <option value="Applied">Applied</option>
                 <option value="Resume Shortlisted">Resume Shortlisted</option>
                 <option value="OA Done">OA Done</option>
+                <option value="Interview Scheduled">Interview Scheduled</option>
+                <option value="Interview Done">Interview Done</option>
+                <option value="Rejected">Rejected</option>
                 <option value="Other">Other</option>
               </select>
             </div>
           </div>
+          <div>
+            <label style={labelStyle}>Applied date</label>
+            <input
+              type="date"
+              value={(jobData.appliedDate || '').slice(0, 10) || todayDateString()}
+              max={todayDateString()}
+              onChange={e => setJobData({ ...jobData, appliedDate: e.target.value })}
+              style={inputStyle}
+            />
+          </div>
+          {resumesLoaded && resumes.length > 0 && (
+            <div>
+              <label style={labelStyle}>Resume used (optional)</label>
+              <select
+                value={jobData.resumeId || ''}
+                onChange={e => setJobData({ ...jobData, resumeId: e.target.value })}
+                style={inputStyle}
+              >
+                <option value="">No resume linked</option>
+                {resumes.map((resume) => (
+                  <option key={resume.id} value={resume.id}>{resume.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button type="button" onClick={handleSave} disabled={saving} style={{ ...primaryButton, marginTop: '0.25rem', opacity: saving ? 0.55 : 1 }}>
-            {saving ? 'Saving…' : <><Send size={15} /> Save to Dashboard</>}
+            {saving ? 'Saving…' : <><Send size={15} /> Save to TrackMyHunt</>}
           </button>
           {savedId && (
             <a
@@ -698,7 +842,7 @@ function App() {
           )}
           <button
             type="button"
-            onClick={() => { setJobData(null); setPhase('empty'); currentJobKey.current = null; showToast(null, null); }}
+            onClick={() => { setJobData(null); setPlatformLabel(''); setPhase('empty'); currentJobKey.current = null; showToast(null, null); }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--muted)' }}
           >
             Cancel

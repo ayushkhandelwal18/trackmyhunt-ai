@@ -9,9 +9,8 @@ function getInitialTheme() {
   } catch {
     // ignore
   }
-  if (typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches) {
-    return "dark";
-  }
+  // Light Mode is the default across the platform. Users can switch to
+  // Dark Mode with the theme toggle; the choice persists via tmh-theme.
   return "light";
 }
 

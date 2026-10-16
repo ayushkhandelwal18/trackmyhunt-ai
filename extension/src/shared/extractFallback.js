@@ -111,6 +111,6 @@ export function fallbackExtract(pageUrl) {
     status: 'Applied',
     applicationLink: url.split('#')[0],
     appliedDate: new Date().toISOString(),
-    notes: 'Detected via TrackMyHunt',
+    notes: 'Saved via TrackMyHunt Browser Extension',
   };
 }

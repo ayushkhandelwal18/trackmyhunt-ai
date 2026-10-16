@@ -14,8 +14,10 @@
     <script>
       (function () {
         try {
+          // Light Mode is the platform default. A stored choice wins;
+          // otherwise render light immediately to avoid a theme flash.
           var stored = localStorage.getItem("tmh-theme");
-          var theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          var theme = stored === "dark" || stored === "light" ? stored : "light";
           document.documentElement.setAttribute("data-theme", theme);
           document.documentElement.style.colorScheme = theme;
         } catch (e) {

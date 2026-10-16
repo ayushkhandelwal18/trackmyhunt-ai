@@ -179,9 +179,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       const token = request.authToken || await getToken() || await getTokenFromDashboardTabs();
 
-      if (!token) {
+      if (!token || typeof token !== 'string') {
         sendResponse({ success: false, error: 'Not authenticated. Please log in on the dashboard first.' });
         return;
+      }
+
+      // Validate the panel payload before it touches the network: company
+      // and role are required, enums fall back to safe defaults, and only
+      // a well-formed saved-resume id is forwarded (the backend re-checks
+      // ownership and fails closed). Invalid shapes are rejected here so a
+      // compromised content context cannot turn the worker into a relay.
+      const VALID_TYPES = ['Intern', 'Full-Time', 'Remote', 'Freelance', 'Intern + Offer', 'Other'];
+      const VALID_STATUSES = ['Applied', 'Resume Shortlisted', 'OA Done', 'Interview Scheduled', 'Interview Done', 'Rejected', 'Other'];
+      const incoming = request.data && typeof request.data === 'object' ? request.data : null;
+      const company = typeof incoming?.company === 'string' ? incoming.company.trim().slice(0, 200) : '';
+      const role = typeof incoming?.role === 'string' ? incoming.role.trim().slice(0, 200) : '';
+      if (!company || !role) {
+        sendResponse({ success: false, error: 'Company and role are required.' });
+        return;
+      }
+      const appliedDate = new Date(incoming.appliedDate);
+      const payload = {
+        company,
+        role,
+        type: VALID_TYPES.includes(incoming.type) ? incoming.type : 'Other',
+        status: VALID_STATUSES.includes(incoming.status) ? incoming.status : 'Applied',
+        applicationLink: typeof incoming.applicationLink === 'string' ? incoming.applicationLink.slice(0, 2000) : '',
+        notes: typeof incoming.notes === 'string' ? incoming.notes.slice(0, 5000) : '',
+        appliedDate: Number.isNaN(appliedDate.getTime()) ? new Date().toISOString() : appliedDate.toISOString(),
+      };
+      if (typeof incoming.resumeId === 'string' && /^[a-f0-9]{24}$/i.test(incoming.resumeId)) {
+        payload.resumeId = incoming.resumeId;
       }
 
       // Use the same backend URL as the web app when the extension is built
@@ -202,6 +230,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       for (const endpoint of endpoints) {
         let response;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 20000);
         try {
           response = await fetch(endpoint, {
             method: 'POST',
@@ -209,13 +239,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify(request.data)
+            body: JSON.stringify(payload),
+            signal: controller.signal,
           });
-        } catch {
-          // Network error (backend down / unreachable): try the next endpoint.
-          lastError = 'Unable to connect to the TrackMyHunt backend.';
+        } catch (error) {
+          // Network error, timeout, or backend down: try the next endpoint.
+          lastError = error && error.name === 'AbortError'
+            ? 'The request timed out. Please try again.'
+            : 'Unable to connect to the TrackMyHunt backend.';
+          clearTimeout(timeout);
           continue;
         }
+        clearTimeout(timeout);
 
         const data = await response.json().catch(() => ({}));
 

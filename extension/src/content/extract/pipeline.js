@@ -38,6 +38,7 @@ import { IndeedExtractor } from '../scrapers/indeed.js';
 import { NaukriExtractor } from '../scrapers/naukri.js';
 import { InternshalaExtractor } from '../scrapers/internshala.js';
 import { GreenhouseExtractor } from '../scrapers/greenhouse.js';
+import { WellfoundExtractor } from '../scrapers/wellfound.js';
 import { LeverExtractor } from '../scrapers/lever.js';
 import { WorkdayExtractor } from '../scrapers/workday.js';
 import { AshbyExtractor } from '../scrapers/ashby.js';
@@ -50,6 +51,7 @@ const REGISTRY = {
   naukri: NaukriExtractor,
   internshala: InternshalaExtractor,
   greenhouse: GreenhouseExtractor,
+  wellfound: WellfoundExtractor,
   lever: LeverExtractor,
   workday: WorkdayExtractor,
   ashby: AshbyExtractor,
@@ -64,6 +66,7 @@ export const PLATFORM_LABELS = {
   naukri: 'Naukri',
   internshala: 'Internshala',
   greenhouse: 'Greenhouse',
+  wellfound: 'Wellfound',
   lever: 'Lever',
   workday: 'Workday',
   ashby: 'Ashby',
@@ -99,6 +102,7 @@ const SITE_NAME_BLOCKLIST = [
   'indeed',
   'naukri',
   'internshala',
+  'wellfound',
   'greenhouse',
   'lever',
   'workday',

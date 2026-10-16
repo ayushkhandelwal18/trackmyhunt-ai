@@ -1,12 +1,13 @@
 // Platform detection: URL first, DOM signals second. Returns one of:
-// linkedin | indeed | naukri | internshala | greenhouse | lever |
-// workday | ashby | google_forms | company_careers | generic
+// linkedin | indeed | naukri | internshala | wellfound | greenhouse |
+// lever | workday | ashby | google_forms | company_careers | generic
 
 const HOST_RULES = [
   [/linkedin\.com\/jobs/i, 'linkedin'],
   [/indeed\.com/i, 'indeed'],
   [/naukri\.com/i, 'naukri'],
   [/internshala\.com/i, 'internshala'],
+  [/wellfound\.com/i, 'wellfound'],
   [/greenhouse\.io/i, 'greenhouse'],
   [/lever\.co/i, 'lever'],
   [/myworkdayjobs\.com|workdayjobs\.com/i, 'workday'],
